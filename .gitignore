@@ -3,3 +3,4 @@ backend/ledger.db
 *.pyc
 __pycache__/
 .env
+*.sqlite3

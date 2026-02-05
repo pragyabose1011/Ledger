@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from app.db.session import SessionLocal  # This will trigger model imports
 from app.api.meetings import router as meetings_router
