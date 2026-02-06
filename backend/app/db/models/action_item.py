@@ -13,4 +13,5 @@ class ActionItem(Base):
     description = Column(Text, nullable=False)
     status = Column(String, default="open")  # open / done
     due_date = Column(DateTime(timezone=True), nullable=True)
+    source_sentence = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
