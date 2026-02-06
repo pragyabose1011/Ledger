@@ -69,6 +69,9 @@ def process_transcript(db, llm, transcript):
             )
         )
 
+    from app.workers.alert_engine import run_alerts_for_meeting
+
+    run_alerts_for_meeting(db, transcript.meeting_id)
 
 
     # -----------------------------

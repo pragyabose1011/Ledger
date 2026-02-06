@@ -10,6 +10,9 @@ from app.api.decisions import router as decisions_router
 from app.api.action_items import router as action_items_router
 from app.api.transcripts import router as transcripts_router
 from app.api.extract import router as extract_router
+from app.api.alerts import router as alerts_router
+from app.api.metrics import router as metrics_router
+
 
 # -------------------------
 # Create app FIRST
@@ -35,6 +38,8 @@ app.include_router(meetings_router)
 app.include_router(decisions_router)
 app.include_router(action_items_router)
 app.include_router(extract_router)
+app.include_router(alerts_router) 
+app.include_router(metrics_router)
 
 # -------------------------
 # Health & root
