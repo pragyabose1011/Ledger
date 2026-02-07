@@ -1,8 +1,7 @@
+// /Users/pragyabose/Ledger/frontend/src/pages/MeetingDetail.tsx
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-
-/* ---------------- TYPES ---------------- */
 
 type Decision = {
   id: string;
@@ -56,10 +55,9 @@ type Metrics = {
   has_outcomes: boolean;
 };
 
-/* ---------------- COMPONENT ---------------- */
-
 export default function MeetingDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
   const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -67,17 +65,13 @@ export default function MeetingDetailPage() {
   const [extracting, setExtracting] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
 
-  /* ---------------- DATA FETCH + METRICS ---------------- */
-
   const fetchAll = async () => {
     setLoading(true);
 
     try {
-      // 1) Meeting
       const meetingRes = await api.get(`/meetings/${id}`);
       setMeeting(meetingRes.data);
 
-      // 2) Alerts (optional)
       try {
         const alertRes = await api.get(`/alerts/${id}`);
         setAlerts(alertRes.data);
@@ -86,7 +80,6 @@ export default function MeetingDetailPage() {
         setAlerts([]);
       }
 
-      // 3) Metrics (optional)
       try {
         const metricsRes = await api.get(`/metrics/meeting/${id}`);
         setMetrics(metricsRes.data);
@@ -102,13 +95,8 @@ export default function MeetingDetailPage() {
   };
 
   useEffect(() => {
-    fetchAll().catch((err) => {
-      console.error("Failed to load data", err);
-      setLoading(false);
-    });
+    fetchAll();
   }, [id]);
-
-  /* ---------------- EXTRACTION ---------------- */
 
   const runExtraction = async () => {
     if (!meeting?.transcript_id) {
@@ -118,11 +106,7 @@ export default function MeetingDetailPage() {
 
     try {
       setExtracting(true);
-
-      await api.post("/extract/", {
-        transcript_id: meeting.transcript_id,
-      });
-
+      await api.post("/extract/", { transcript_id: meeting.transcript_id });
       await fetchAll();
     } catch (err) {
       console.error(err);
@@ -132,264 +116,162 @@ export default function MeetingDetailPage() {
     }
   };
 
-  /* ---------------- GUARD ---------------- */
-
   if (loading || !meeting) {
-    return <div style={{ padding: 40 }}>Loading meeting…</div>;
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <p className="text-slate-400">Loading meeting…</p>
+      </div>
+    );
   }
 
-  /* ---------------- NORMALIZATION ---------------- */
-
   const transcriptLines =
-    meeting.transcript_content
-      ?.split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean) ?? [];
+    meeting.transcript_content?.split("\n").map((l) => l.trim()).filter(Boolean) ?? [];
 
-  const decisionSentences = meeting.decisions
-    .map((d) => d.source_sentence)
-    .filter((s): s is string => Boolean(s));
-
-  const actionSentences = meeting.action_items
-    .map((a) => a.source_sentence)
-    .filter((s): s is string => Boolean(s));
-
-  /* ---------------- UI ---------------- */
+  const decisionSentences = meeting.decisions.map((d) => d.source_sentence).filter((s): s is string => Boolean(s));
+  const actionSentences = meeting.action_items.map((a) => a.source_sentence).filter((s): s is string => Boolean(s));
 
   return (
-    <div style={{ padding: 40, maxWidth: 900 }}>
-      <Link to="/meetings">← Back to meetings</Link>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
 
-      <h1 style={{ marginTop: 16 }}>{meeting.title}</h1>
-      <p style={{ color: "#7a1c1c" }}>{meeting.platform}</p>
+      <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-10">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-ledger-pink shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
+              <span className="text-lg font-semibold tracking-tight">Ledger</span>
+            </div>
+            <span className="text-slate-600">•</span>
+            <button onClick={() => navigate("/meetings")} className="text-sm text-slate-400 hover:text-ledger-pink transition-colors">
+              ← Back to meetings
+            </button>
+          </div>
 
-      <button
-        onClick={runExtraction}
-        disabled={extracting}
-        style={{
-          marginTop: 12,
-          padding: "10px 18px",
-          fontSize: 14,
-          borderRadius: 6,
-          cursor: extracting ? "not-allowed" : "pointer",
-        }}
-      >
-        {extracting ? "Extracting…" : "Run / Re-run Extraction"}
-      </button>
+          <button onClick={runExtraction} disabled={extracting} className="rounded-full bg-ledger-pink px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_0_20px_rgba(244,114,182,0.5)] hover:bg-pink-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {extracting ? "Extracting…" : "Re-run Extraction"}
+          </button>
+        </div>
+      </header>
 
-      {/* ---------------- TRANSCRIPT ---------------- */}
+      <main className="relative mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-semibold">{meeting.title}</h1>
+            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">{meeting.platform || "Platform"}</span>
+          </div>
+          <p className="text-sm text-slate-400">View insights</p>
+        </div>
 
-      <h2 style={{ marginTop: 32 }}>Transcript</h2>
+        {alerts.length > 0 && (
+          <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 backdrop-blur">
+            <h3 className="mb-2 text-sm font-medium text-amber-400">⚠️ Alerts</h3>
+            <ul className="space-y-1">
+              {alerts.map((a) => (
+                <li key={a.id} className="text-sm text-amber-200/80">{a.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-      {transcriptLines.length === 0 ? (
-        <p style={{ color: "#888" }}>No transcript uploaded.</p>
-      ) : (
-        <ul style={{ listStyle: "none", paddingLeft: 0 }}>
-          {transcriptLines.map((line, idx) => {
-            const isDecision = decisionSentences.some((s) => line.includes(s));
-            const isAction = actionSentences.some((s) => line.includes(s));
+        {metrics && (
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur">
+              <div className="text-2xl font-bold text-ledger-pink">{metrics.decisions}</div>
+              <div className="mt-1 text-sm text-slate-400">Decisions</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur">
+              <div className="text-2xl font-bold text-ledger-pink">{metrics.action_items}</div>
+              <div className="mt-1 text-sm text-slate-400">Action Items</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur">
+              <div className="text-2xl font-bold text-ledger-pink">{metrics.productivity_score}</div>
+              <div className="mt-1 text-sm text-slate-400">Productivity Score</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur">
+              <div className="text-sm font-medium text-slate-300 capitalize">{metrics.classification.replace(/_/g, " ")}</div>
+              <div className="mt-1 text-sm text-slate-400">Classification</div>
+            </div>
+          </div>
+        )}
 
-            let bg = "#fff";
-            let border = "#ddd";
-            let tooltip: string | undefined;
-
-            if (isDecision && isAction) {
-              bg = "#e0f2fe";
-              border = "#3b82f6";
-              tooltip = "Decision & Action Item";
-            } else if (isDecision) {
-              bg = "#ecfdf5";
-              border = "#10b981";
-              tooltip = "Decision";
-            } else if (isAction) {
-              bg = "#fffbeb";
-              border = "#f59e0b";
-              tooltip = "Action Item";
-            }
-
-            return (
-              <li
-                key={idx}
-                title={tooltip}
-                style={{
-                  background: bg,
-                  borderLeft: `5px solid ${border}`,
-                  padding: "8px 12px",
-                  marginBottom: 6,
-                  borderRadius: 6,
-                  fontSize: 14,
-                }}
-              >
-                {line}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* ---------------- DECISIONS ---------------- */}
-
-      <h2 style={{ marginTop: 32 }}>Decisions</h2>
-
-      {meeting.decisions.length === 0 ? (
-        <p>No decisions recorded.</p>
-      ) : (
-        <ul>
-          {meeting.decisions.map((d) => (
-            <li key={d.id}>
-              {d.summary}{" "}
-              {d.confidence != null && (
-                <span style={{ color: "#666", fontSize: 12 }}>
-                  ({Math.round(d.confidence * 100)}% confidence)
-                </span>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold"><span className="text-emerald-400">✓</span> Decisions</h2>
+              {meeting.decisions.length === 0 ? (
+                <p className="text-sm text-slate-500">No decisions recorded.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {meeting.decisions.map((d) => (
+                    <li key={d.id} className="rounded-lg border border-slate-800 bg-slate-800/30 p-3">
+                      <p className="text-sm text-slate-200">{d.summary}</p>
+                      {d.confidence != null && <p className="mt-1 text-xs text-slate-500">{Math.round(d.confidence * 100)}% confidence</p>}
+                    </li>
+                  ))}
+                </ul>
               )}
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
 
-      {/* ---------------- ACTION ITEMS ---------------- */}
-
-      <h2 style={{ marginTop: 32 }}>Action Items</h2>
-
-      {meeting.action_items.length === 0 ? (
-        <p>No action items.</p>
-      ) : (
-        <table
-          style={{
-            borderCollapse: "collapse",
-            marginTop: 12,
-            width: "100%",
-          }}
-        >
-          <thead>
-            <tr>
-              <th style={th}>Description</th>
-              <th style={th}>Owner</th>
-              <th style={th}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {meeting.action_items.map((a) => (
-              <tr key={a.id}>
-                <td style={td}>
-                  {a.description}
-                  {a.confidence != null && (
-                    <div style={{ color: "#666", fontSize: 12 }}>
-                      {Math.round(a.confidence * 100)}% confidence
-                    </div>
-                  )}
-                </td>
-                <td style={td}>{a.owner ?? "-"}</td>
-                <td style={td}>{a.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {/* ---------------- PRODUCTIVITY SUMMARY ---------------- */}
-
-      <h2 style={{ marginTop: 30 }}>📊 Productivity Metrics</h2>
-
-      {metrics ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 16,
-            marginTop: 12,
-          }}
-        >
-          <div style={{ padding: 16, border: "1px solid #ddd" }}>
-            <strong>Decisions</strong>
-            <div>{metrics.decisions}</div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold"><span className="text-red-400">⚠</span> Risks & Blockers</h2>
+              {meeting.risks.length === 0 ? (
+                <p className="text-sm text-slate-500">No risks identified.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {meeting.risks.map((r) => (
+                    <li key={r.id} className="rounded-lg border border-red-900/30 bg-red-900/10 p-3">
+                      <p className="text-sm text-red-200">{r.description}</p>
+                      {r.confidence != null && <p className="mt-1 text-xs text-red-400/60">{Math.round(r.confidence * 100)}% confidence</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
-          <div style={{ padding: 16, border: "1px solid #ddd" }}>
-            <strong>Action Items</strong>
-            <div>{metrics.action_items}</div>
-          </div>
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold"><span className="text-amber-400">◆</span> Action Items</h2>
+              {meeting.action_items.length === 0 ? (
+                <p className="text-sm text-slate-500">No action items.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {meeting.action_items.map((a) => (
+                    <li key={a.id} className="rounded-lg border border-slate-800 bg-slate-800/30 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm text-slate-200">{a.description}</p>
+                        <span className="shrink-0 rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300">{a.status}</span>
+                      </div>
+                      {a.owner && <p className="mt-1 text-xs text-slate-500">Owner: {a.owner}</p>}
+                      {a.confidence != null && <p className="mt-1 text-xs text-slate-500">{Math.round(a.confidence * 100)}% confidence</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          <div style={{ padding: 16, border: "1px solid #ddd" }}>
-            <strong>Owned Actions</strong>
-            <div>{metrics.actions_with_owner}</div>
-          </div>
-
-          <div style={{ padding: 16, border: "1px solid #ddd" }}>
-            <strong>Unowned Actions</strong>
-            <div>{metrics.actions_without_owner}</div>
-          </div>
-
-          <div style={{ padding: 16, border: "1px solid #ddd" }}>
-            <strong>Has Outcomes</strong>
-            <div>{metrics.has_outcomes ? "✅ Yes" : "❌ No"}</div>
-          </div>
-
-          <div
-            style={{
-              padding: 16,
-              border: "2px solid #2563eb",
-              fontWeight: "bold",
-            }}
-          >
-            Productivity Score
-            <div>{metrics.productivity_score}</div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
+              <h2 className="mb-4 text-xl font-semibold">Transcript</h2>
+              {transcriptLines.length === 0 ? (
+                <p className="text-sm text-slate-500">No transcript uploaded.</p>
+              ) : (
+                <div className="max-h-96 space-y-2 overflow-y-auto">
+                  {transcriptLines.map((line, idx) => {
+                    const isDecision = decisionSentences.some((s) => line.includes(s));
+                    const isAction = actionSentences.some((s) => line.includes(s));
+                    let borderColor = "border-slate-800";
+                    let bgColor = "bg-slate-800/20";
+                    if (isDecision && isAction) { borderColor = "border-blue-500/50"; bgColor = "bg-blue-500/10"; }
+                    else if (isDecision) { borderColor = "border-emerald-500/50"; bgColor = "bg-emerald-500/10"; }
+                    else if (isAction) { borderColor = "border-amber-500/50"; bgColor = "bg-amber-500/10"; }
+                    return <div key={idx} className={`rounded-lg border ${borderColor} ${bgColor} p-2 text-xs text-slate-300`}>{line}</div>;
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      ) : (
-        <p>Loading metrics…</p>
-      )}
-
-      {/* ---------------- RISKS / BLOCKERS ---------------- */}
-
-      <h2 style={{ marginTop: 32 }}>Risks & Blockers</h2>
-
-      {meeting.risks.length === 0 ? (
-        <p>No risks identified.</p>
-      ) : (
-        <ul>
-          {meeting.risks.map((r) => (
-            <li key={r.id}>
-              {r.description}{" "}
-              {r.confidence != null && (
-                <span style={{ color: "#666", fontSize: 12 }}>
-                  ({Math.round(r.confidence * 100)}% confidence)
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* ---------------- ALERTS ---------------- */}
-
-      <h2 style={{ marginTop: 32 }}>Alerts</h2>
-
-      {alerts.length === 0 ? (
-        <p style={{ color: "#666" }}>No alerts 🎉</p>
-      ) : (
-        <ul>
-          {alerts.map((a) => (
-            <li key={a.id} style={{ color: "#b45309" }}>
-              ⚠️ {a.message}
-            </li>
-          ))}
-        </ul>
-      )}
+      </main>
     </div>
   );
 }
-
-/* ---------------- STYLES ---------------- */
-
-const th = {
-  border: "1px solid #333",
-  padding: 8,
-  background: "#f3f3f3",
-};
-
-const td = {
-  border: "1px solid #333",
-  padding: 8,
-};

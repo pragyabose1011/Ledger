@@ -16,6 +16,7 @@ from app.api.response_schemas import (
     ActionItemResponse,
 )
 from app.api.auth import get_current_user  # ← add this import
+from app.db.models.risk import Risk
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -93,6 +94,13 @@ def get_meeting(meeting_id: str, db: Session = Depends(get_db), current_user: Us
     .all()
     )
 
+    risks = (
+        db.query(Risk)
+        .filter(Risk.meeting_id == meeting_id)
+        .order_by(Risk.created_at.desc())
+        .all()
+    )
+
     action_items_response = []
     for a in action_items:
         owner_name =  None
@@ -107,6 +115,7 @@ def get_meeting(meeting_id: str, db: Session = Depends(get_db), current_user: Us
             "owner": owner_name,
             "source_sentence": a.source_sentence,
             "created_at": a.created_at,
+            "acknowledged_at": a.acknowledged_at,  # ← NEW
         })
 
 
@@ -129,6 +138,7 @@ def get_meeting(meeting_id: str, db: Session = Depends(get_db), current_user: Us
     "decisions": decisions,
 
     "action_items": action_items_response,
+    "risks": risks,
 
 }
 

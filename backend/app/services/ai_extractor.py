@@ -1,3 +1,4 @@
+# /Users/pragyabose/Ledger/backend/app/services/ai_extractor.py
 import json
 from openai import OpenAIError
 
@@ -9,6 +10,7 @@ Return STRICT JSON with this schema:
   "decisions": [
     {
       "summary": "string",
+      "owner": "string | null",
       "source_sentence": "string | null",
       "confidence": 0.0
     }
@@ -21,6 +23,13 @@ Return STRICT JSON with this schema:
       "source_sentence": "string | null",
       "confidence": 0.0
     }
+  ],
+  "risks": [
+    {
+      "description": "string",
+      "source_sentence": "string | null",
+      "confidence": 0.0
+    }
   ]
 }
 
@@ -28,12 +37,17 @@ Rules for confidence:
 - confidence is between 0 and 1
 - higher when the statement is clear, explicit, and committed
 - lower when it's vague, tentative, or hypothetical
+
+Rules for owner:
+- Extract the person's name if explicitly mentioned
+- Use null if no clear owner is stated
 """
 
 DUMMY_RESPONSE = {
     "decisions": [
         {
             "summary": "Ship beta by Friday",
+            "owner": "Alice",
             "source_sentence": "Alice: We should ship version 2 by Monday.",
             "confidence": 0.9,
         }
@@ -54,6 +68,13 @@ DUMMY_RESPONSE = {
             "confidence": 0.8,
         },
     ],
+    "risks": [
+        {
+            "description": "Launch date may slip if testing finds blockers",
+            "source_sentence": "Charlie: If QA finds major bugs, we might miss Friday.",
+            "confidence": 0.8,
+        }
+    ],
 }
 
 
@@ -72,13 +93,11 @@ def extract_decisions_and_actions(llm, transcript_text: str) -> dict:
         return json.loads(content)
 
     except OpenAIError as e:
-        # 🔥 THIS IS THE KEY FIX
         print("⚠️ OpenAI error, falling back to Dummy response")
         print(str(e))
         return DUMMY_RESPONSE
 
     except Exception as e:
-        # Safety net for malformed JSON, etc.
         print("⚠️ Unexpected error, using Dummy response")
         print(str(e))
         return DUMMY_RESPONSE

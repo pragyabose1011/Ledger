@@ -10,6 +10,7 @@ from app.db.models.action_item import ActionItem  # noqa
 from app.db.models.transcript import Transcript  # noqa
 from app.db.base import Base
 from app.db.models.alert import Alert  # noqa  # add this
+from app.db.models.risk import Risk  # noqa  # add this
 
 DATABASE_URL = "sqlite:///./ledger.db"
 

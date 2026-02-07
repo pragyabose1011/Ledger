@@ -16,6 +16,7 @@ class ActionItem(Base):
     due_date = Column(DateTime(timezone=True), nullable=True)
     source_sentence = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)  # <-- add this
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)  # ← NEW
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     owner = relationship("User", back_populates="action_items")

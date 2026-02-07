@@ -1,3 +1,4 @@
+# /Users/pragyabose/Ledger/backend/app/workers/extract_from_transcript.py
 print("🔥 RUNNING UPDATED extract_from_transcript.py 🔥")
 
 from datetime import datetime
@@ -5,6 +6,7 @@ from app.services.ai_extractor import extract_decisions_and_actions
 from app.db.models.decision import Decision
 from app.db.models.action_item import ActionItem
 from app.db.models.user import User
+from app.db.models.risk import Risk
 
 def process_transcript(db, llm, transcript):
     # -----------------------------
@@ -18,6 +20,10 @@ def process_transcript(db, llm, transcript):
         ActionItem.meeting_id == transcript.meeting_id
     ).delete()
 
+    db.query(Risk).filter(
+        Risk.meeting_id == transcript.meeting_id
+    ).delete()
+
     db.commit()
 
     # -----------------------------
@@ -27,18 +33,30 @@ def process_transcript(db, llm, transcript):
         llm, transcript.content
     )
 
-        # -----------------------------
-    # 3. SAVE DECISIONS (with confidence)
+    # -----------------------------
+    # 3. SAVE DECISIONS (with owner + confidence)
     # -----------------------------
     for d in result.get("decisions", []):
         if isinstance(d, dict):
             summary = d.get("summary") or d.get("text") or ""
             source_sentence = d.get("source_sentence")
             confidence = d.get("confidence")
+            owner_name = d.get("owner")
         else:
             summary = str(d)
             source_sentence = None
             confidence = None
+            owner_name = None
+
+        owner_id = None
+        if owner_name:
+            owner = db.query(User).filter(User.name == owner_name).first()
+            if not owner:
+                owner = User(name=owner_name, email=f"{owner_name.lower().replace(' ', '.')}@example.com")
+                db.add(owner)
+                db.commit()
+                db.refresh(owner)
+            owner_id = owner.id
 
         db.add(
             Decision(
@@ -46,38 +64,31 @@ def process_transcript(db, llm, transcript):
                 summary=summary,
                 source_sentence=source_sentence,
                 confidence=confidence,
+                owner_id=owner_id,
             )
         )
     
     # -----------------------------
-    # 4. SAVE ACTION ITEMS (FIXED)
+    # 4. SAVE ACTION ITEMS
     # -----------------------------
     for a in result.get("action_items", []):
-        # Resolve owner_name → User → owner_id
         owner_name = a.get("owner")
         owner_id = None
         if owner_name:
-            owner = (
-                db.query(User)
-                .filter(User.name == owner_name)
-                .first()
-            )
-
+            owner = db.query(User).filter(User.name == owner_name).first()
             if not owner:
-                owner = User(name=owner_name)
+                owner = User(name=owner_name, email=f"{owner_name.lower().replace(' ', '.')}@example.com")
                 db.add(owner)
                 db.commit()
                 db.refresh(owner)
-
             owner_id = owner.id
 
-        # Parse due_date from ISO string, if present
         due = None
         if a.get("due_date"):
             try:
                 due = datetime.fromisoformat(a["due_date"])
             except Exception:
-                pass  # ignore malformed dates
+                pass
 
         db.add(
             ActionItem(
@@ -91,13 +102,33 @@ def process_transcript(db, llm, transcript):
             )
         )
 
-
-    from app.workers.alert_engine import run_alerts_for_meeting
-
-    run_alerts_for_meeting(db, transcript.meeting_id)
-
-
     # -----------------------------
-    # 5. COMMIT
+    # 5. SAVE RISKS
     # -----------------------------
+    for r in result.get("risks", []):
+        if isinstance(r, dict):
+            description = r.get("description") or ""
+            source_sentence = r.get("source_sentence")
+            confidence = r.get("confidence")
+        else:
+            description = str(r)
+            source_sentence = None
+            confidence = None
+
+        db.add(
+            Risk(
+                meeting_id=transcript.meeting_id,
+                description=description,
+                source_sentence=source_sentence,
+                confidence=confidence,
+            )
+        )
+
     db.commit()
+
+    # -----------------------------
+    # 6. RUN ALERTS (single + repeated)
+    # -----------------------------
+    from app.workers.alert_engine import run_alerts_for_meeting, detect_repeated_issues
+    run_alerts_for_meeting(db, transcript.meeting_id)
+    detect_repeated_issues(db, transcript.meeting_id)
