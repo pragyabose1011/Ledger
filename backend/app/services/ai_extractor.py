@@ -6,33 +6,54 @@ You are an assistant that extracts structured information from meeting transcrip
 
 Return STRICT JSON with this schema:
 {
-  "decisions": [{ "summary": "string" }],
+  "decisions": [
+    {
+      "summary": "string",
+      "source_sentence": "string | null",
+      "confidence": 0.0
+    }
+  ],
   "action_items": [
     {
       "description": "string",
       "owner": "string | null",
-      "due_date": "string | null"
+      "due_date": "string | null",
+      "source_sentence": "string | null",
+      "confidence": 0.0
     }
   ]
 }
+
+Rules for confidence:
+- confidence is between 0 and 1
+- higher when the statement is clear, explicit, and committed
+- lower when it's vague, tentative, or hypothetical
 """
 
 DUMMY_RESPONSE = {
     "decisions": [
-        {"summary": "Ship beta by Friday"}
+        {
+            "summary": "Ship beta by Friday",
+            "source_sentence": "Alice: We should ship version 2 by Monday.",
+            "confidence": 0.9,
+        }
     ],
     "action_items": [
         {
             "description": "Prepare announcement blog post",
             "owner": "Alice",
-            "due_date": None
+            "due_date": None,
+            "source_sentence": "Bob: I will prepare the migration plan.",
+            "confidence": 0.85,
         },
         {
             "description": "Test deployment and report issues",
             "owner": "Bob",
-            "due_date": None
-        }
-    ]
+            "due_date": None,
+            "source_sentence": "Charlie: Let's review metrics next sprint.",
+            "confidence": 0.8,
+        },
+    ],
 }
 
 

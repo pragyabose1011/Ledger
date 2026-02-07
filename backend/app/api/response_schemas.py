@@ -15,6 +15,7 @@ class DecisionResponse(BaseModel):
     summary: str
     created_at: datetime
     source_sentence: Optional[str] = None
+    confidence: Optional[float] = None
 
 
 class ActionItemResponse(BaseModel):
@@ -24,6 +25,8 @@ class ActionItemResponse(BaseModel):
     owner: Optional[str] = None
     created_at: datetime
     source_sentence: Optional[str] = None
+    confidence: Optional[float] = None
+    
     class Config:
         from_attributes = True
 

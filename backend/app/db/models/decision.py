@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Float  # ← add Float
 from sqlalchemy.sql import func
 
 from app.db.base import Base
@@ -11,4 +11,5 @@ class Decision(Base):
     meeting_id = Column(String, ForeignKey("meetings.id"), nullable=False)
     summary = Column(Text, nullable=False)
     source_sentence = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)  # <-- add this
     created_at = Column(DateTime(timezone=True), server_default=func.now())

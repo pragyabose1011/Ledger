@@ -1,5 +1,6 @@
 print("🔥 RUNNING UPDATED extract_from_transcript.py 🔥")
 
+from datetime import datetime
 from app.services.ai_extractor import extract_decisions_and_actions
 from app.db.models.decision import Decision
 from app.db.models.action_item import ActionItem
@@ -26,38 +27,57 @@ def process_transcript(db, llm, transcript):
         llm, transcript.content
     )
 
-    # -----------------------------
-    # 3. SAVE DECISIONS
+        # -----------------------------
+    # 3. SAVE DECISIONS (with confidence)
     # -----------------------------
     for d in result.get("decisions", []):
         if isinstance(d, dict):
-            summary = d.get("summary") or d.get("text")
+            summary = d.get("summary") or d.get("text") or ""
+            source_sentence = d.get("source_sentence")
+            confidence = d.get("confidence")
         else:
             summary = str(d)
+            source_sentence = None
+            confidence = None
 
         db.add(
             Decision(
                 meeting_id=transcript.meeting_id,
                 summary=summary,
+                source_sentence=source_sentence,
+                confidence=confidence,
             )
         )
-
+    
     # -----------------------------
     # 4. SAVE ACTION ITEMS (FIXED)
     # -----------------------------
-    
-
-    for a in result["action_items"]:
+    for a in result.get("action_items", []):
+        # Resolve owner_name → User → owner_id
+        owner_name = a.get("owner")
         owner_id = None
+        if owner_name:
+            owner = (
+                db.query(User)
+                .filter(User.name == owner_name)
+                .first()
+            )
 
-        if a.get("owner"):
-            user = db.query(User).filter(User.name == a["owner"]).first()
-            if not user:
-                user = User(name=a["owner"])
-                db.add(user)
-                db.flush()  # get user.id without commit
+            if not owner:
+                owner = User(name=owner_name)
+                db.add(owner)
+                db.commit()
+                db.refresh(owner)
 
-            owner_id = user.id
+            owner_id = owner.id
+
+        # Parse due_date from ISO string, if present
+        due = None
+        if a.get("due_date"):
+            try:
+                due = datetime.fromisoformat(a["due_date"])
+            except Exception:
+                pass  # ignore malformed dates
 
         db.add(
             ActionItem(
@@ -65,9 +85,12 @@ def process_transcript(db, llm, transcript):
                 description=a["description"],
                 status="open",
                 owner_id=owner_id,
+                due_date=due,
                 source_sentence=a.get("source_sentence"),
+                confidence=a.get("confidence"),
             )
         )
+
 
     from app.workers.alert_engine import run_alerts_for_meeting
 

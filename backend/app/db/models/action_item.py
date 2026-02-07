@@ -1,6 +1,7 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Float  # ← add Float
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 
@@ -14,4 +15,7 @@ class ActionItem(Base):
     status = Column(String, default="open")  # open / done
     due_date = Column(DateTime(timezone=True), nullable=True)
     source_sentence = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)  # <-- add this
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    owner = relationship("User", back_populates="action_items")

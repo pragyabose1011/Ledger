@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { api } from "../lib/api";
 
 type Meeting = {
   id: string;
@@ -13,18 +13,36 @@ export default function Meetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    axios
-      .get("http://127.0.0.1:8000/meetings")
+  const loadMeetings = () => {
+    api
+      .get("/meetings/")
       .then((res) => setMeetings(res.data))
       .catch((err) => {
         console.error("Failed to load meetings", err);
       });
-  }, []);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    loadMeetings();
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setMeetings([]);
+    navigate("/login");
+  };
 
   return (
     <div style={{ padding: 40 }}>
-      <h1 style={{ fontSize: 24, marginBottom: 20 }}>Meetings</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+        <h1 style={{ fontSize: 24 }}>Meetings</h1>
+        <button onClick={handleLogout}>Log out</button>
+      </div>
 
       {meetings.length === 0 ? (
         <p>No meetings found.</p>

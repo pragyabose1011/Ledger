@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import axios from "axios";
+import { api } from "../lib/api";
 
 /* ---------------- TYPES ---------------- */
 
@@ -8,6 +8,7 @@ type Decision = {
   id: string;
   summary: string;
   source_sentence: string | null;
+  confidence?: number | null;
 };
 
 type ActionItem = {
@@ -16,6 +17,7 @@ type ActionItem = {
   status: string;
   owner: string | null;
   source_sentence: string | null;
+  confidence?: number | null;
 };
 
 type Alert = {
@@ -36,10 +38,14 @@ type MeetingDetail = {
 };
 
 type Metrics = {
+  meeting_id: string;
   decisions: number;
   action_items: number;
   productivity_score: number;
   classification: string;
+  actions_with_owner: number;
+  actions_without_owner: number;
+  has_outcomes: boolean;
 };
 
 
@@ -62,16 +68,12 @@ export default function MeetingDetailPage() {
 
     try {
       // 1) Meeting
-      const meetingRes = await axios.get(
-        `http://127.0.0.1:8000/meetings/${id}`
-      );
+      const meetingRes = await api.get(`/meetings/${id}`);
       setMeeting(meetingRes.data);
 
       // 2) Alerts (optional)
       try {
-        const alertRes = await axios.get(
-          `http://127.0.0.1:8000/alerts/${id}`
-        );
+        const alertRes = await api.get(`/alerts/${id}`);
         setAlerts(alertRes.data);
       } catch (err) {
         console.error("Failed to load alerts", err);
@@ -80,20 +82,20 @@ export default function MeetingDetailPage() {
 
       // 3) Metrics (optional)
       try {
-        const metricsRes = await axios.get(
-          `http://127.0.0.1:8000/metrics/meeting/${id}`
-        );
+        const metricsRes = await api.get(`/metrics/meeting/${id}`);
         setMetrics(metricsRes.data);
       } catch (err) {
         console.error("Failed to load metrics", err);
         setMetrics(null);
       }
+
     } catch (err) {
       console.error("Failed to load meeting", err);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchAll().catch((err) => {
@@ -114,7 +116,7 @@ export default function MeetingDetailPage() {
     try {
       setExtracting(true);
 
-      await axios.post("http://127.0.0.1:8000/extract/", {
+      await api.post("/extract/", {
         transcript_id: meeting.transcript_id,
       });
 
@@ -153,7 +155,7 @@ export default function MeetingDetailPage() {
 
   return (
     <div style={{ padding: 40, maxWidth: 900 }}>
-      <Link to="/">← Back to meetings</Link>
+      <Link to="/meetings">← Back to meetings</Link>
 
       <h1 style={{ marginTop: 16 }}>{meeting.title}</h1>
       <p style={{ color: "#7a1c1c" }}>{meeting.platform}</p>
@@ -181,33 +183,44 @@ export default function MeetingDetailPage() {
       ) : (
         <ul style={{ listStyle: "none", paddingLeft: 0 }}>
           {transcriptLines.map((line, idx) => {
-            let bg = "#fff";
-            let border = "#ddd";
+              const isDecision = decisionSentences.some((s) => line.includes(s));
+              const isAction = actionSentences.some((s) => line.includes(s));
 
-            if (decisionSentences.some((s) => line.includes(s))) {
-              bg = "#ecfdf5";
-              border = "#10b981";
-            } else if (actionSentences.some((s) => line.includes(s))) {
-              bg = "#fffbeb";
-              border = "#f59e0b";
-            }
+              let bg = "#fff";
+              let border = "#ddd";
+              let tooltip: string | undefined;
 
-            return (
-              <li
-                key={idx}
-                style={{
-                  background: bg,
-                  borderLeft: `5px solid ${border}`,
-                  padding: "8px 12px",
-                  marginBottom: 6,
-                  borderRadius: 6,
-                  fontSize: 14,
-                }}
-              >
-                {line}
-              </li>
-            );
-          })}
+              if (isDecision && isAction) {
+                bg = "#e0f2fe";
+                border = "#3b82f6";
+                tooltip = "Decision & Action Item";
+              } else if (isDecision) {
+                bg = "#ecfdf5";
+                border = "#10b981";
+                tooltip = "Decision";
+              } else if (isAction) {
+                bg = "#fffbeb";
+                border = "#f59e0b";
+                tooltip = "Action Item";
+              }
+
+              return (
+                <li
+                  key={idx}
+                  title={tooltip}
+                  style={{
+                    background: bg,
+                    borderLeft: `5px solid ${border}`,
+                    padding: "8px 12px",
+                    marginBottom: 6,
+                    borderRadius: 6,
+                    fontSize: 14,
+                  }}
+                >
+                  {line}
+                </li>
+              );
+            })}
         </ul>
       )}
 
@@ -220,7 +233,14 @@ export default function MeetingDetailPage() {
       ) : (
         <ul>
           {meeting.decisions.map((d) => (
-            <li key={d.id}>{d.summary}</li>
+            <li key={d.id}>
+              {d.summary}{" "}
+              {d.confidence != null && (
+                <span style={{ color: "#666", fontSize: 12 }}>
+                  ({Math.round(d.confidence * 100)}% confidence)
+                </span>
+              )}
+            </li>
           ))}
         </ul>
       )}
@@ -249,7 +269,14 @@ export default function MeetingDetailPage() {
           <tbody>
             {meeting.action_items.map((a) => (
               <tr key={a.id}>
-                <td style={td}>{a.description}</td>
+                <td style={td}>
+                  {a.description}
+                  {a.confidence != null && (
+                    <div style={{ color: "#666", fontSize: 12 }}>
+                      {Math.round(a.confidence * 100)}% confidence
+                    </div>
+                  )}
+                </td>
                 <td style={td}>{a.owner ?? "-"}</td>
                 <td style={td}>{a.status}</td>
               </tr>
@@ -259,49 +286,71 @@ export default function MeetingDetailPage() {
       )}
       {/* ---------------- PRODUCTIVITY SUMMARY ---------------- */}
 
-      <h2 style={{ marginTop: 32 }}>Productivity Summary</h2>
+      <h2 style={{ marginTop: 30 }}>📊 Productivity Metrics</h2>
 
-      {metrics && (
+      {metrics ? (
         <div
           style={{
-            padding: 16,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            background:
-              metrics.classification === "productive"
-                ? "#fbd0ec"
-                : metrics.classification === "needs_follow_up"
-                ? "#feeda5"
-                : "#ffb4b4",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 16,
+            marginTop: 12,
           }}
         >
-          <p>
-            <strong>Decisions:</strong> {metrics.decisions}
-          </p>
-          <p>
-            <strong>Action Items:</strong> {metrics.action_items}
-          </p>
-          <p>
-            <strong>Classification:</strong>{" "}
-            {metrics.classification.replace("_", " ")}
-          </p>
+          <div style={{ padding: 16, border: "1px solid #ddd" }}>
+            <strong>Decisions</strong>
+            <div>{metrics.decisions_count}</div>
+          </div>
+
+          <div style={{ padding: 16, border: "1px solid #ddd" }}>
+            <strong>Action Items</strong>
+            <div>{metrics.action_items_count}</div>
+          </div>
+
+          <div style={{ padding: 16, border: "1px solid #ddd" }}>
+            <strong>Owned Actions</strong>
+            <div>{metrics.actions_with_owner}</div>
+          </div>
+
+          <div style={{ padding: 16, border: "1px solid #ddd" }}>
+            <strong>Unowned Actions</strong>
+            <div>{metrics.actions_without_owner}</div>
+          </div>
+
+          <div style={{ padding: 16, border: "1px solid #ddd" }}>
+            <strong>Has Outcomes</strong>
+            <div>{metrics.has_outcomes ? "✅ Yes" : "❌ No"}</div>
+          </div>
+
+          <div
+            style={{
+              padding: 16,
+              border: "2px solid #2563eb",
+              fontWeight: "bold",
+            }}
+          >
+            Productivity Score
+            <div>{metrics.productivity_score}</div>
+          </div>
         </div>
+      ) : (
+        <p>Loading metrics…</p>
       )}
       {/* ---------------- ALERTS ---------------- */}
 
       <h2 style={{ marginTop: 32 }}>Alerts</h2>
 
-      {alerts.length === 0 ? (
-        <p style={{ color: "#666" }}>No alerts 🎉</p>
-      ) : (
-        <ul>
-          {alerts.map((a) => (
-            <li key={a.id} style={{ color: "#b45309" }}>
-              ⚠️ {a.message}
-            </li>
-          ))}
-        </ul>
-      )}
+        {alerts.length === 0 ? (
+          <p style={{ color: "#666" }}>No alerts 🎉</p>
+        ) : (
+          <ul>
+            {alerts.map((a) => (
+              <li key={a.id} style={{ color: "#b45309" }}>
+                ⚠️ {a.message}
+              </li>
+            ))}
+          </ul>
+        )}
     </div>
   );
 }

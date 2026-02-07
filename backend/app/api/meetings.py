@@ -15,6 +15,7 @@ from app.api.response_schemas import (
     DecisionResponse,
     ActionItemResponse,
 )
+from app.api.auth import get_current_user  # ← add this import
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -31,10 +32,11 @@ def get_db():
 # WRITE API
 # -------------------------
 @router.post("/")
-def create_meeting(payload: dict, db: Session = Depends(get_db)):
+def create_meeting(payload: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     meeting = Meeting(
         title=payload["title"],
         platform=payload.get("platform"),
+        owner_id=current_user.id,  # ← ownership
     )
     db.add(meeting)
     db.commit()
@@ -66,13 +68,13 @@ def create_meeting(payload: dict, db: Session = Depends(get_db)):
 # READ APIs
 # -------------------------
 @router.get("/", response_model=List[MeetingListItem])
-def list_meetings(db: Session = Depends(get_db)):
-    meetings = db.query(Meeting).order_by(Meeting.created_at.desc()).all()
+def list_meetings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    meetings = db.query(Meeting).filter(Meeting.owner_id == current_user.id).order_by(Meeting.created_at.desc()).all()
     return meetings
 
 
 @router.get("/{meeting_id}", response_model=MeetingDetailResponse)
-def get_meeting(meeting_id: str, db: Session = Depends(get_db)):
+def get_meeting(meeting_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     meeting = db.query(Meeting).get(meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
@@ -85,11 +87,28 @@ def get_meeting(meeting_id: str, db: Session = Depends(get_db)):
     )
 
     action_items = (
-    db.query(ActionItem, User)
-        .outerjoin(User, ActionItem.owner_id == User.id)
-        .filter(ActionItem.meeting_id == meeting_id)
-        .all()
+    db.query(ActionItem)
+    .filter(ActionItem.meeting_id == meeting_id)
+    .order_by(ActionItem.created_at.desc())
+    .all()
     )
+
+    action_items_response = []
+    for a in action_items:
+        owner_name =  None
+        if a.owner_id:
+            user = db.query(User).get(a.owner_id)
+            owner_name = user.name if user else None
+
+        action_items_response.append({
+            "id": a.id,
+            "description": a.description,
+            "status": a.status,
+            "owner": owner_name,
+            "source_sentence": a.source_sentence,
+            "created_at": a.created_at,
+        })
+
 
     transcript = (
     db.query(Transcript)
@@ -109,17 +128,8 @@ def get_meeting(meeting_id: str, db: Session = Depends(get_db)):
 
     "decisions": decisions,
 
-    "action_items": [
-        {
-            "id": ai.id,
-            "description": ai.description,
-            "status": ai.status,
-            "owner": user.name if user else None,
-            "source_sentence": ai.source_sentence,
-            "created_at": ai.created_at,
-        }
-        for ai, user in action_items
-    ],
+    "action_items": action_items_response,
+
 }
 
 

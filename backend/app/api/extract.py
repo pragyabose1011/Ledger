@@ -32,6 +32,7 @@ def extract(payload: ExtractRequest, db: Session = Depends(get_db)):
 
     try:
         process_transcript(db, llm, transcript)
+
     except Exception as e:
         # Log and return the error so caller can see why extraction failed
         import traceback
