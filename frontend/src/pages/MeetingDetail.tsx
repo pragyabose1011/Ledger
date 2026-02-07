@@ -26,6 +26,13 @@ type Alert = {
   message: string;
 };
 
+type Risk = {
+  id: string;
+  description: string;
+  source_sentence: string | null;
+  confidence?: number | null;
+};
+
 type MeetingDetail = {
   id: string;
   title: string;
@@ -35,6 +42,7 @@ type MeetingDetail = {
   has_extractions: boolean;
   decisions: Decision[];
   action_items: ActionItem[];
+  risks: Risk[];
 };
 
 type Metrics = {
@@ -48,7 +56,6 @@ type Metrics = {
   has_outcomes: boolean;
 };
 
-
 /* ---------------- COMPONENT ---------------- */
 
 export default function MeetingDetailPage() {
@@ -60,8 +67,7 @@ export default function MeetingDetailPage() {
   const [extracting, setExtracting] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
 
-
-    /* ---------------- DATA FETCH + METRICS ---------------- */
+  /* ---------------- DATA FETCH + METRICS ---------------- */
 
   const fetchAll = async () => {
     setLoading(true);
@@ -88,7 +94,6 @@ export default function MeetingDetailPage() {
         console.error("Failed to load metrics", err);
         setMetrics(null);
       }
-
     } catch (err) {
       console.error("Failed to load meeting", err);
     } finally {
@@ -96,14 +101,12 @@ export default function MeetingDetailPage() {
     }
   };
 
-
   useEffect(() => {
     fetchAll().catch((err) => {
       console.error("Failed to load data", err);
       setLoading(false);
     });
   }, [id]);
-
 
   /* ---------------- EXTRACTION ---------------- */
 
@@ -183,44 +186,44 @@ export default function MeetingDetailPage() {
       ) : (
         <ul style={{ listStyle: "none", paddingLeft: 0 }}>
           {transcriptLines.map((line, idx) => {
-              const isDecision = decisionSentences.some((s) => line.includes(s));
-              const isAction = actionSentences.some((s) => line.includes(s));
+            const isDecision = decisionSentences.some((s) => line.includes(s));
+            const isAction = actionSentences.some((s) => line.includes(s));
 
-              let bg = "#fff";
-              let border = "#ddd";
-              let tooltip: string | undefined;
+            let bg = "#fff";
+            let border = "#ddd";
+            let tooltip: string | undefined;
 
-              if (isDecision && isAction) {
-                bg = "#e0f2fe";
-                border = "#3b82f6";
-                tooltip = "Decision & Action Item";
-              } else if (isDecision) {
-                bg = "#ecfdf5";
-                border = "#10b981";
-                tooltip = "Decision";
-              } else if (isAction) {
-                bg = "#fffbeb";
-                border = "#f59e0b";
-                tooltip = "Action Item";
-              }
+            if (isDecision && isAction) {
+              bg = "#e0f2fe";
+              border = "#3b82f6";
+              tooltip = "Decision & Action Item";
+            } else if (isDecision) {
+              bg = "#ecfdf5";
+              border = "#10b981";
+              tooltip = "Decision";
+            } else if (isAction) {
+              bg = "#fffbeb";
+              border = "#f59e0b";
+              tooltip = "Action Item";
+            }
 
-              return (
-                <li
-                  key={idx}
-                  title={tooltip}
-                  style={{
-                    background: bg,
-                    borderLeft: `5px solid ${border}`,
-                    padding: "8px 12px",
-                    marginBottom: 6,
-                    borderRadius: 6,
-                    fontSize: 14,
-                  }}
-                >
-                  {line}
-                </li>
-              );
-            })}
+            return (
+              <li
+                key={idx}
+                title={tooltip}
+                style={{
+                  background: bg,
+                  borderLeft: `5px solid ${border}`,
+                  padding: "8px 12px",
+                  marginBottom: 6,
+                  borderRadius: 6,
+                  fontSize: 14,
+                }}
+              >
+                {line}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -284,6 +287,7 @@ export default function MeetingDetailPage() {
           </tbody>
         </table>
       )}
+
       {/* ---------------- PRODUCTIVITY SUMMARY ---------------- */}
 
       <h2 style={{ marginTop: 30 }}>📊 Productivity Metrics</h2>
@@ -299,12 +303,12 @@ export default function MeetingDetailPage() {
         >
           <div style={{ padding: 16, border: "1px solid #ddd" }}>
             <strong>Decisions</strong>
-            <div>{metrics.decisions_count}</div>
+            <div>{metrics.decisions}</div>
           </div>
 
           <div style={{ padding: 16, border: "1px solid #ddd" }}>
             <strong>Action Items</strong>
-            <div>{metrics.action_items_count}</div>
+            <div>{metrics.action_items}</div>
           </div>
 
           <div style={{ padding: 16, border: "1px solid #ddd" }}>
@@ -336,21 +340,43 @@ export default function MeetingDetailPage() {
       ) : (
         <p>Loading metrics…</p>
       )}
+
+      {/* ---------------- RISKS / BLOCKERS ---------------- */}
+
+      <h2 style={{ marginTop: 32 }}>Risks & Blockers</h2>
+
+      {meeting.risks.length === 0 ? (
+        <p>No risks identified.</p>
+      ) : (
+        <ul>
+          {meeting.risks.map((r) => (
+            <li key={r.id}>
+              {r.description}{" "}
+              {r.confidence != null && (
+                <span style={{ color: "#666", fontSize: 12 }}>
+                  ({Math.round(r.confidence * 100)}% confidence)
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* ---------------- ALERTS ---------------- */}
 
       <h2 style={{ marginTop: 32 }}>Alerts</h2>
 
-        {alerts.length === 0 ? (
-          <p style={{ color: "#666" }}>No alerts 🎉</p>
-        ) : (
-          <ul>
-            {alerts.map((a) => (
-              <li key={a.id} style={{ color: "#b45309" }}>
-                ⚠️ {a.message}
-              </li>
-            ))}
-          </ul>
-        )}
+      {alerts.length === 0 ? (
+        <p style={{ color: "#666" }}>No alerts 🎉</p>
+      ) : (
+        <ul>
+          {alerts.map((a) => (
+            <li key={a.id} style={{ color: "#b45309" }}>
+              ⚠️ {a.message}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Meetings from "./pages/Meetings";
 import MeetingDetailPage from "./pages/MeetingDetail";
-import Login from "./pages/Login";
+import Login from "./pages/login";
 
 export default function App() {
   return (
