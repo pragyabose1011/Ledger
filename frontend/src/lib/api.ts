@@ -13,6 +13,14 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+export async function signup(name: string, email: string, password: string) {
+  const res = await api.post("/auth/signup", { name, email, password });
+  const token = res.data.access_token as string;
+  localStorage.setItem("token", token);
+  return token;
+}
+
 export async function login(email: string, password: string) {
   const res = await api.post("/auth/login", { email, password });
   const token = res.data.access_token as string;

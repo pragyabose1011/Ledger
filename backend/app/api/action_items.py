@@ -1,3 +1,4 @@
+# /Users/pragyabose/Ledger/backend/app/api/action_items.py
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,7 +46,6 @@ def acknowledge_action_item(
         raise HTTPException(status_code=404, detail="Action item not found")
 
     if item.status == "done":
-        # Already completed; nothing to do
         return {"status": "already_done"}
 
     item.acknowledged_at = datetime.now(timezone.utc)
@@ -54,3 +54,39 @@ def acknowledge_action_item(
     db.refresh(item)
 
     return {"status": "acknowledged", "action_item_id": item.id}
+
+
+@router.post("/{action_item_id}/done")
+def mark_action_item_done(
+    action_item_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.query(ActionItem).get(action_item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Action item not found")
+
+    item.status = "done"
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return {"status": "done", "action_item_id": item.id}
+
+
+@router.post("/{action_item_id}/reopen")
+def reopen_action_item(
+    action_item_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.query(ActionItem).get(action_item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Action item not found")
+
+    item.status = "open"
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return {"status": "open", "action_item_id": item.id}
