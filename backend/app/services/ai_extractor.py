@@ -1,6 +1,9 @@
-# /Users/pragyabose/Ledger/backend/app/services/ai_extractor.py
 import json
+import os
+import httpx
 from openai import OpenAIError
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 SYSTEM_PROMPT = """
 You are an assistant that extracts structured information from meeting transcripts.
@@ -41,44 +44,51 @@ Rules for confidence:
 Rules for owner:
 - Extract the person's name if explicitly mentioned
 - Use null if no clear owner is stated
+
+IMPORTANT: Return ONLY valid JSON, no other text.
 """
 
-DUMMY_RESPONSE = {
-    "decisions": [
-        {
-            "summary": "Ship beta by Friday",
-            "owner": "Alice",
-            "source_sentence": "Alice: We should ship version 2 by Monday.",
-            "confidence": 0.9,
-        }
-    ],
-    "action_items": [
-        {
-            "description": "Prepare announcement blog post",
-            "owner": "Alice",
-            "due_date": None,
-            "source_sentence": "Bob: I will prepare the migration plan.",
-            "confidence": 0.85,
-        },
-        {
-            "description": "Test deployment and report issues",
-            "owner": "Bob",
-            "due_date": None,
-            "source_sentence": "Charlie: Let's review metrics next sprint.",
-            "confidence": 0.8,
-        },
-    ],
-    "risks": [
-        {
-            "description": "Launch date may slip if testing finds blockers",
-            "source_sentence": "Charlie: If QA finds major bugs, we might miss Friday.",
-            "confidence": 0.8,
-        }
-    ],
-}
+
+def extract_with_ollama(transcript_text: str, model: str = "llama3.1:8b") -> dict:
+    """Extract using local Ollama model."""
+    prompt = f"""{SYSTEM_PROMPT}
+
+Meeting Transcript:
+---
+{transcript_text}
+---
+
+Extract decisions, action items, and risks from the transcript above. Return ONLY valid JSON:"""
+
+    try:
+        with httpx.Client(timeout=120) as client:
+            response = client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json",
+                },
+            )
+            result = response.json()["response"]
+            
+            # Try to parse JSON from response
+            # Sometimes LLMs add extra text, so find the JSON part
+            start = result.find("{")
+            end = result.rfind("}") + 1
+            if start != -1 and end > start:
+                json_str = result[start:end]
+                return json.loads(json_str)
+            
+            return json.loads(result)
+    except Exception as e:
+        print(f"⚠️ Ollama extraction failed: {e}")
+        return None
 
 
 def extract_decisions_and_actions(llm, transcript_text: str) -> dict:
+    # First try OpenAI
     try:
         response = llm.chat.completions.create(
             model="gpt-4o-mini",
@@ -93,11 +103,35 @@ def extract_decisions_and_actions(llm, transcript_text: str) -> dict:
         return json.loads(content)
 
     except OpenAIError as e:
-        print("⚠️ OpenAI error, falling back to Dummy response")
-        print(str(e))
-        return DUMMY_RESPONSE
+        print(f"⚠️ OpenAI error: {e}")
+        print("🔄 Trying Ollama fallback...")
+        
+        # Try Ollama as fallback
+        ollama_result = extract_with_ollama(transcript_text)
+        if ollama_result:
+            print("✅ Ollama extraction successful")
+            return ollama_result
+        
+        # If Ollama also fails, return empty results (not dummy data)
+        print("⚠️ Both OpenAI and Ollama failed, returning empty results")
+        return {
+            "decisions": [],
+            "action_items": [],
+            "risks": [],
+        }
+
+    except json.JSONDecodeError as e:
+        print(f"⚠️ JSON parse error: {e}")
+        return {
+            "decisions": [],
+            "action_items": [],
+            "risks": [],
+        }
 
     except Exception as e:
-        print("⚠️ Unexpected error, using Dummy response")
-        print(str(e))
-        return DUMMY_RESPONSE
+        print(f"⚠️ Unexpected error: {e}")
+        return {
+            "decisions": [],
+            "action_items": [],
+            "risks": [],
+        }
