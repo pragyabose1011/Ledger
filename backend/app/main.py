@@ -17,6 +17,8 @@ from app.api.notifications import router as notifications_router
 from app.api.export import router as export_router
 from app.api.oauth import router as oauth_router
 from app.api.rag import router as rag_router  # <-- ADD THIS
+from app.api.upload import router as upload_router
+from app.api.integrations import router as integrations_router
 
 app = FastAPI(title="Ledger API", version="0.1.0")
 
@@ -40,6 +42,8 @@ app.include_router(notifications_router)
 app.include_router(export_router)
 app.include_router(oauth_router)
 app.include_router(rag_router)  # <-- ADD THIS
+app.include_router(upload_router)  # <-- ADD THIS
+app.include_router(integrations_router)  
 
 @app.get("/")
 async def root():
