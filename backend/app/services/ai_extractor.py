@@ -2,6 +2,10 @@ import json
 import os
 import httpx
 from openai import OpenAIError
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
@@ -88,8 +92,8 @@ Extract decisions, action items, and risks from the transcript above. Return ONL
 
 
 def extract_decisions_and_actions(llm, transcript_text: str) -> dict:
-    # First try OpenAI
     try:
+        logger.info("Sending transcript to OpenAI for extraction.")
         response = llm.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -98,40 +102,70 @@ def extract_decisions_and_actions(llm, transcript_text: str) -> dict:
             ],
             temperature=0
         )
-
         content = response.choices[0].message.content
+        logger.info(f"OpenAI response: {content[:200]}...")  # Log first 200 chars
         return json.loads(content)
 
     except OpenAIError as e:
-        print(f"⚠️ OpenAI error: {e}")
-        print("🔄 Trying Ollama fallback...")
-        
-        # Try Ollama as fallback
+        logger.error(f"⚠️ OpenAI error: {e}")
+        logger.info("🔄 Trying Ollama fallback...")
         ollama_result = extract_with_ollama(transcript_text)
         if ollama_result:
-            print("✅ Ollama extraction successful")
+            logger.info("✅ Ollama extraction successful")
             return ollama_result
-        
-        # If Ollama also fails, return empty results (not dummy data)
-        print("⚠️ Both OpenAI and Ollama failed, returning empty results")
+        logger.error("⚠️ Both OpenAI and Ollama failed, returning empty results")
         return {
             "decisions": [],
             "action_items": [],
             "risks": [],
         }
-
     except json.JSONDecodeError as e:
-        print(f"⚠️ JSON parse error: {e}")
+        logger.error(f"⚠️ JSON parse error: {e}")
         return {
             "decisions": [],
             "action_items": [],
             "risks": [],
         }
-
     except Exception as e:
-        print(f"⚠️ Unexpected error: {e}")
+        logger.error(f"⚠️ Unexpected error: {e}")
         return {
             "decisions": [],
             "action_items": [],
             "risks": [],
         }
+    
+def extract_with_ollama(transcript_text: str, model: str = "llama3.1:8b") -> dict:
+    prompt = f"""{SYSTEM_PROMPT}
+
+    Meeting Transcript:
+    ---
+    {transcript_text}
+    ---
+
+    Extract decisions, action items, and risks from the transcript above. Return ONLY valid JSON:"""
+
+    try:
+        logger.info(f"Sending prompt to Ollama: {prompt[:200]}...")  # Log first 200 chars
+        with httpx.Client(timeout=120) as client:
+            response = client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json",
+                },
+            )
+            logger.info(f"Ollama raw response: {response.text}")
+            result = response.json()["response"]
+            logger.info(f"Ollama extracted response: {result[:200]}...")  # Log first 200 chars
+
+            start = result.find("{")
+            end = result.rfind("}") + 1
+            if start != -1 and end > start:
+                json_str = result[start:end]
+                return json.loads(json_str)
+            return json.loads(result)
+    except Exception as e:
+        logger.error(f"⚠️ Ollama extraction failed: {e}")
+        return None

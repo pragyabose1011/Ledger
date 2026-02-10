@@ -6,7 +6,10 @@ import Meetings from "./pages/Meetings";
 import MeetingDetailPage from "./pages/MeetingDetail";
 import Dashboard from "./pages/Dashboard";
 import OAuthCallback from "./pages/OAuthCallback";
+import CalendarPage from "./pages/Calendar";
 import ChatPage from "./pages/Chat";
+import IntegrationsPage from "./pages/Integrations";
+
 
 function App() {
   return (
@@ -18,7 +21,9 @@ function App() {
       <Route path="/meetings/:id" element={<MeetingDetailPage />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/oauth-callback" element={<OAuthCallback />} />
+      <Route path="/calendar" element={<CalendarPage />} />
       <Route path="/chat" element={<ChatPage />} />
+      <Route path="/integrations" element={<IntegrationsPage />} />
     </Routes>
   );
 }

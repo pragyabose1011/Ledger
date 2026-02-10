@@ -106,7 +106,6 @@ export default function Meetings() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
 
-
       <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
@@ -115,11 +114,24 @@ export default function Meetings() {
           </div>
 
           <div className="flex items-center gap-4">
+            
+<button
+  onClick={() => navigate("/integrations")}
+  className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
+>
+  Integrations
+</button>
             <button
               onClick={() => navigate("/chat")}
               className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
             >
               Ask AI
+            </button>
+            <button
+              onClick={() => navigate("/calendar")}
+              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
+            >
+              Calendar
             </button>
             <button
               onClick={() => navigate("/dashboard")}
@@ -142,7 +154,6 @@ export default function Meetings() {
           </div>
         </div>
       </header>
-
 
       <main className="relative mx-auto max-w-7xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">
@@ -334,6 +345,5 @@ export default function Meetings() {
         </div>
       )}
     </div>
-    
   );
 }

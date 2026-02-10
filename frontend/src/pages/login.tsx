@@ -19,6 +19,21 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('extension') === 'true') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      // Send token to extension
+      try {
+        chrome.runtime?.sendMessage?.({ type: 'SAVE_TOKEN', token });
+      } catch (e) {
+        // Not in extension context
+      }
+    }
+  }
+}, []);
+
+  useEffect(() => {
     // Check for OAuth error in URL
     const oauthError = searchParams.get("error");
     if (oauthError) {

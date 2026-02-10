@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
+type Participant = {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;
+};
+
 type Decision = {
   id: string;
   summary: string;
@@ -37,6 +44,7 @@ type MeetingDetail = {
   title: string;
   platform?: string;
   transcript_id: string | null;
+  participants: Participant[];
   transcript_content: string | null;
   has_extractions: boolean;
   decisions: Decision[];
@@ -102,10 +110,63 @@ export default function MeetingDetailPage() {
   const [extracting, setExtracting] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [newParticipantEmail, setNewParticipantEmail] = useState("");
+  const [addingParticipant, setAddingParticipant] = useState(false);
 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [transcriptText, setTranscriptText] = useState("");
   const [uploading, setUploading] = useState(false);
+
+  // Add near other useState declarations:
+  const [showAudioUpload, setShowAudioUpload] = useState(false);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+
+  // Add near other handler functions:
+
+  const handleAudioUpload = async () => {
+    if (!audioFile) {
+      alert("Please select an audio file");
+      return;
+    }
+
+    try {
+      setUploadingAudio(true);
+      setUploadProgress("Uploading file...");
+
+      const formData = new FormData();
+      formData.append("file", audioFile);
+      formData.append("meeting_id", id!);
+      formData.append("use_local_whisper", "false");
+
+      setUploadProgress("Transcribing audio (this may take a minute)...");
+
+      const res = await api.post("/upload/audio", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setUploadProgress("Running AI extraction...");
+      
+      // Auto-run extraction
+      await api.post("/extract/", { transcript_id: res.data.transcript_id });
+
+      setShowAudioUpload(false);
+      setAudioFile(null);
+      setUploadProgress("");
+      await fetchAll();
+      
+      alert("Audio transcribed and extracted successfully!");
+    } catch (err: any) {
+      console.error("Audio upload failed", err);
+      alert(err.response?.data?.detail || "Failed to upload and transcribe audio");
+    } finally {
+      setUploadingAudio(false);
+      setUploadProgress("");
+    }
+  };
 
   const fetchAll = async () => {
     setLoading(true);
@@ -155,6 +216,38 @@ export default function MeetingDetailPage() {
       alert("Extraction failed. Check backend logs.");
     } finally {
       setExtracting(false);
+    }
+  };
+
+  const handleAddParticipant = async () => {
+    if (!newParticipantEmail.trim()) return;
+
+    try {
+      setAddingParticipant(true);
+      await api.post(`/meetings/${id}/participants`, {
+        email: newParticipantEmail,
+        name: newParticipantEmail.split("@")[0],
+        role: "attendee",
+      });
+      setNewParticipantEmail("");
+      const res = await api.get(`/meetings/${id}`);
+      setMeeting(res.data);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to add participant");
+    } finally {
+      setAddingParticipant(false);
+    }
+  };
+
+  const handleRemoveParticipant = async (userId: string) => {
+    if (!confirm("Remove this participant?")) return;
+
+    try {
+      await api.delete(`/meetings/${id}/participants/${userId}`);
+      const res = await api.get(`/meetings/${id}`);
+      setMeeting(res.data);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to remove participant");
     }
   };
 
@@ -208,14 +301,14 @@ export default function MeetingDetailPage() {
     try {
       setExporting(true);
       const response = await api.get(`/export/meeting/${id}/pdf`, {
-        responseType: 'blob',
+        responseType: "blob",
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      const safeTitle = meeting?.title.replace(/[^a-zA-Z0-9-_ ]/g, '') || 'meeting';
-      link.setAttribute('download', `ledger-${safeTitle}.pdf`);
+      const safeTitle = meeting?.title.replace(/[^a-zA-Z0-9-_ ]/g, "") || "meeting";
+      link.setAttribute("download", `ledger-${safeTitle}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -274,7 +367,6 @@ export default function MeetingDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Export PDF Button */}
             {meeting.has_extractions && (
               <button
                 onClick={handleExportPDF}
@@ -305,6 +397,105 @@ export default function MeetingDetailPage() {
                 Upload Transcript
               </button>
             )}
+           
+
+{!meeting.transcript_id && (
+  <>
+    <button
+      onClick={() => setShowUploadModal(true)}
+      className="rounded-full border border-ledger-pink px-4 py-2 text-sm font-medium text-ledger-pink hover:bg-ledger-pink hover:text-slate-950 transition-colors"
+    >
+      Upload Transcript
+    </button>
+    <button
+      onClick={() => setShowAudioUpload(true)}
+      className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:border-ledger-pink hover:text-ledger-pink transition-colors flex items-center gap-2"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+      </svg>
+      Upload Audio
+    </button>
+  </>
+)}
+
+
+
+{/* Audio Upload Modal */}
+{showAudioUpload && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+      <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
+        <svg className="w-6 h-6 text-ledger-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+        Upload Audio/Video
+      </h2>
+      
+      <p className="mb-4 text-sm text-slate-400">
+        Upload a recording and we'll automatically transcribe it using AI.
+      </p>
+
+      <div className="mb-4">
+        <label className="mb-2 block text-sm text-slate-300">Select file</label>
+        <input
+          type="file"
+          accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.ogg"
+          onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-slate-100 file:mr-4 file:rounded-full file:border-0 file:bg-ledger-pink file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-950 hover:file:bg-pink-400"
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          Supported: MP3, MP4, WAV, M4A, WebM, OGG • Max 25MB
+        </p>
+      </div>
+
+      {audioFile && (
+        <div className="mb-4 rounded-lg border border-slate-700 bg-slate-800/30 p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ledger-pink/20 text-ledger-pink">
+              🎵
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-slate-200 truncate">{audioFile.name}</p>
+              <p className="text-xs text-slate-500">
+                {(audioFile.size / (1024 * 1024)).toFixed(2)} MB
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uploadProgress && (
+        <div className="mb-4 rounded-lg border border-ledger-pink/30 bg-ledger-pink/5 p-3">
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
+            <p className="text-sm text-ledger-pink">{uploadProgress}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          onClick={() => {
+            setShowAudioUpload(false);
+            setAudioFile(null);
+          }}
+          disabled={uploadingAudio}
+          className="flex-1 rounded-lg border border-slate-700 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleAudioUpload}
+          disabled={uploadingAudio || !audioFile}
+          className="flex-1 rounded-lg bg-ledger-pink px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-pink-400 transition-colors disabled:opacity-50"
+        >
+          {uploadingAudio ? "Processing..." : "Transcribe"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
             <button
               onClick={runExtraction}
               disabled={extracting || !meeting.transcript_id}
@@ -343,12 +534,79 @@ export default function MeetingDetailPage() {
           </div>
         )}
 
+        {/* Participants Section */}
+        <div className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+              </svg>
+              Participants
+              <span className="text-sm text-slate-500 font-normal">
+                ({meeting?.participants?.length || 0})
+              </span>
+            </h2>
+          </div>
+
+          {/* Add Participant Form */}
+          <div className="flex gap-2 mb-4">
+            <input
+              type="email"
+              placeholder="Add participant by email..."
+              value={newParticipantEmail}
+              onChange={(e) => setNewParticipantEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddParticipant()}
+              className="flex-1 rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-ledger-pink focus:outline-none"
+            />
+            <button
+              onClick={handleAddParticipant}
+              disabled={addingParticipant || !newParticipantEmail.trim()}
+              className="rounded-lg bg-ledger-pink px-4 py-2 text-sm font-medium text-slate-950 hover:bg-pink-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {addingParticipant ? "..." : "Add"}
+            </button>
+          </div>
+
+          {/* Participants List */}
+          {meeting?.participants && meeting.participants.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {meeting.participants.map((p) => (
+                <div
+                  key={p.id}
+                  className="group flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/50 px-3 py-1.5"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center text-xs font-medium text-white">
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-slate-200">{p.name}</span>
+                    {p.role && <span className="text-xs text-slate-500">{p.role}</span>}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveParticipant(p.id)}
+                    className="ml-1 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all"
+                    title="Remove participant"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No participants added yet</p>
+          )}
+        </div>
+
         {alerts.length > 0 && (
           <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 backdrop-blur">
             <h3 className="mb-2 text-sm font-medium text-amber-400">⚠️ Alerts</h3>
             <ul className="space-y-1">
               {alerts.map((a) => (
-                <li key={a.id} className="text-sm text-amber-200/80">{a.message}</li>
+                <li key={a.id} className="text-sm text-amber-200/80">
+                  {a.message}
+                </li>
               ))}
             </ul>
           </div>
@@ -379,7 +637,9 @@ export default function MeetingDetailPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
               <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold"><span className="text-emerald-400">✓</span> Decisions</h2>
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+                  <span className="text-emerald-400">✓</span> Decisions
+                </h2>
                 {meeting.decisions.length === 0 ? (
                   <p className="text-sm text-slate-500">No decisions recorded.</p>
                 ) : (
@@ -387,7 +647,9 @@ export default function MeetingDetailPage() {
                     {meeting.decisions.map((d) => (
                       <li key={d.id} className="rounded-lg border border-slate-800 bg-slate-800/30 p-3">
                         <p className="text-sm text-slate-200">{d.summary}</p>
-                        {d.confidence != null && <p className="mt-1 text-xs text-slate-500">{Math.round(d.confidence * 100)}% confidence</p>}
+                        {d.confidence != null && (
+                          <p className="mt-1 text-xs text-slate-500">{Math.round(d.confidence * 100)}% confidence</p>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -395,7 +657,9 @@ export default function MeetingDetailPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold"><span className="text-red-400">⚠</span> Risks & Blockers</h2>
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+                  <span className="text-red-400">⚠</span> Risks & Blockers
+                </h2>
                 {meeting.risks.length === 0 ? (
                   <p className="text-sm text-slate-500">No risks identified.</p>
                 ) : (
@@ -403,7 +667,9 @@ export default function MeetingDetailPage() {
                     {meeting.risks.map((r) => (
                       <li key={r.id} className="rounded-lg border border-red-900/30 bg-red-900/10 p-3">
                         <p className="text-sm text-red-200">{r.description}</p>
-                        {r.confidence != null && <p className="mt-1 text-xs text-red-400/60">{Math.round(r.confidence * 100)}% confidence</p>}
+                        {r.confidence != null && (
+                          <p className="mt-1 text-xs text-red-400/60">{Math.round(r.confidence * 100)}% confidence</p>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -413,13 +679,20 @@ export default function MeetingDetailPage() {
 
             <div className="space-y-6">
               <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold"><span className="text-amber-400">◆</span> Action Items</h2>
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+                  <span className="text-amber-400">◆</span> Action Items
+                </h2>
                 {meeting.action_items.length === 0 ? (
                   <p className="text-sm text-slate-500">No action items.</p>
                 ) : (
                   <ul className="space-y-3">
                     {meeting.action_items.map((a) => (
-                      <li key={a.id} className={`rounded-lg border p-3 ${a.status === "done" ? "border-emerald-800/50 bg-emerald-900/10" : "border-slate-800 bg-slate-800/30"}`}>
+                      <li
+                        key={a.id}
+                        className={`rounded-lg border p-3 ${
+                          a.status === "done" ? "border-emerald-800/50 bg-emerald-900/10" : "border-slate-800 bg-slate-800/30"
+                        }`}
+                      >
                         <div className="flex items-start gap-3">
                           <button
                             onClick={() => toggleActionDone(a.id, a.status)}
@@ -440,22 +713,16 @@ export default function MeetingDetailPage() {
                             <p className={`text-sm ${a.status === "done" ? "text-slate-400 line-through" : "text-slate-200"}`}>
                               {a.description}
                             </p>
-                            
+
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               {a.owner && (
-                                <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300">
-                                  {a.owner}
-                                </span>
+                                <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300">{a.owner}</span>
                               )}
-                              
+
                               {a.status === "done" ? (
-                                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
-                                  ✓ Done
-                                </span>
+                                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">✓ Done</span>
                               ) : a.acknowledged_at ? (
-                                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
-                                  ✓ Acknowledged
-                                </span>
+                                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">✓ Acknowledged</span>
                               ) : (
                                 <button
                                   onClick={() => acknowledgeAction(a.id)}
@@ -465,11 +732,7 @@ export default function MeetingDetailPage() {
                                 </button>
                               )}
 
-                              {a.confidence != null && (
-                                <span className="text-xs text-slate-500">
-                                  {Math.round(a.confidence * 100)}%
-                                </span>
-                              )}
+                              {a.confidence != null && <span className="text-xs text-slate-500">{Math.round(a.confidence * 100)}%</span>}
                             </div>
                           </div>
                         </div>
@@ -483,10 +746,7 @@ export default function MeetingDetailPage() {
               <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Transcript</h2>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="text-xs text-ledger-pink hover:underline"
-                  >
+                  <button onClick={() => setShowUploadModal(true)} className="text-xs text-ledger-pink hover:underline">
                     Replace transcript
                   </button>
                 </div>
@@ -494,10 +754,7 @@ export default function MeetingDetailPage() {
                 {speakers.length > 0 && (
                   <div className="mb-4 flex flex-wrap gap-2">
                     {speakers.map((speaker) => (
-                      <span
-                        key={speaker}
-                        className={`rounded-full border px-2 py-0.5 text-xs ${getSpeakerColor(speaker)}`}
-                      >
+                      <span key={speaker} className={`rounded-full border px-2 py-0.5 text-xs ${getSpeakerColor(speaker)}`}>
                         {speaker}
                       </span>
                     ))}
@@ -523,7 +780,7 @@ export default function MeetingDetailPage() {
                     {transcriptLines.map((line, idx) => {
                       let highlightClass = "";
                       let borderIndicator = "";
-                      
+
                       if (line.isDecision && line.isAction) {
                         highlightClass = "bg-blue-500/10";
                         borderIndicator = "border-l-4 border-l-blue-500";
@@ -539,15 +796,10 @@ export default function MeetingDetailPage() {
                       }
 
                       return (
-                        <div
-                          key={idx}
-                          className={`rounded-lg border border-slate-800/50 bg-slate-800/20 p-3 ${highlightClass} ${borderIndicator}`}
-                        >
+                        <div key={idx} className={`rounded-lg border border-slate-800/50 bg-slate-800/20 p-3 ${highlightClass} ${borderIndicator}`}>
                           {line.speaker ? (
                             <div className="flex items-start gap-3">
-                              <span
-                                className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${getSpeakerColor(line.speaker)}`}
-                              >
+                              <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${getSpeakerColor(line.speaker)}`}>
                                 {line.speaker}
                               </span>
                               <p className="text-sm text-slate-300 leading-relaxed">{line.message}</p>
@@ -559,19 +811,13 @@ export default function MeetingDetailPage() {
                           {(line.isDecision || line.isAction || line.isRisk) && (
                             <div className="mt-2 flex gap-2">
                               {line.isDecision && (
-                                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-400">
-                                  Decision
-                                </span>
+                                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-400">Decision</span>
                               )}
                               {line.isAction && (
-                                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">
-                                  Action Item
-                                </span>
+                                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">Action Item</span>
                               )}
                               {line.isRisk && (
-                                <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-400">
-                                  Risk
-                                </span>
+                                <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-400">Risk</span>
                               )}
                             </div>
                           )}
@@ -592,7 +838,8 @@ export default function MeetingDetailPage() {
           <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <h2 className="mb-4 text-xl font-semibold">Upload Transcript</h2>
             <p className="mb-4 text-sm text-slate-400">
-              Paste your meeting transcript below. Use <code className="rounded bg-slate-800 px-1 text-ledger-pink">Speaker: message</code> format for speaker labels.
+              Paste your meeting transcript below. Use <code className="rounded bg-slate-800 px-1 text-ledger-pink">Speaker: message</code> format
+              for speaker labels.
             </p>
 
             <textarea

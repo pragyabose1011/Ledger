@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Ledger Meeting Recorder",
+  "version": "1.0.0",
+  "description": "Record meeting audio and transcribe with Ledger",
+  "permissions": [
+    "activeTab",
+    "tabCapture",
+    "storage",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://meet.google.com/*",
+    "https://zoom.us/*",
+    "https://teams.microsoft.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
