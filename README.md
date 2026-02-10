@@ -39,21 +39,21 @@ Ledger addresses this gap by acting as a **canonical intelligence layer** that r
 * Meeting creation and participant management
 * Transcript ingestion via REST APIs
 * Decoupled capture mechanism (SDK-ready architecture)
+* **Audio/Video Upload:** Upload recordings and auto-transcribe with OpenAI Whisper or local Whisper
 
 ### 2. AI Intelligence Layer
 
 * LLM-driven extraction of:
-
   * decisions
   * action items
 * Structured JSON output for downstream processing
 * Provider-agnostic design (OpenAI + fallback engine)
+* **Ask AI:** Query meeting history using Retrieval-Augmented Generation (RAG)
 
 ### 3. Persistence & Data Modeling
 
 * Normalized relational schema
 * Entities include:
-
   * meetings
   * participants
   * transcripts
@@ -73,16 +73,16 @@ Ledger addresses this gap by acting as a **canonical intelligence layer** that r
 ## High-Level Architecture
 
 ```
-Client (Swagger / cURL / Future UI)
+Client (React UI / Swagger / cURL)
         |
         v
 API Layer (FastAPI Routers)
         |
         v
-Service Layer (AI Extraction)
+Service Layer (AI Extraction, Integrations)
         |
         v
-LLM Provider (OpenAI / Fallback)
+LLM Provider (OpenAI / Ollama / Fallback)
         |
         v
 Persistence Layer (SQLAlchemy ORM)
@@ -108,6 +108,15 @@ backend/
 │   └── main.py         # Application entrypoint
 ├── requirements.txt
 └── Dockerfile
+
+frontend/
+├── src/
+│   ├── pages/          # React pages (Meetings, Calendar, Integrations, etc.)
+│   ├── lib/            # API utilities
+│   └── App.tsx         # Router and layout
+├── public/
+├── package.json
+└── README.md
 ```
 
 ---
@@ -116,21 +125,24 @@ backend/
 
 ### Meetings API
 
-* `POST /meetings`
-
-  * Create meetings with participant metadata
+* `POST /meetings` — Create meetings with participant metadata
 
 ### Transcripts API
 
-* `POST /transcripts`
-
-  * Store raw meeting transcripts
+* `POST /transcripts` — Store raw meeting transcripts
 
 ### AI Extraction API
 
-* `POST /extract`
+* `POST /extract` — Trigger AI-based extraction pipeline
 
-  * Trigger AI-based extraction pipeline
+### Audio Upload API
+
+* `POST /upload/audio` — Upload audio/video files for transcription
+
+### Integrations API
+
+* `GET /integrations/zoom/recordings` — List Zoom cloud recordings
+* `POST /integrations/zoom/import` — Import Zoom recording/transcript
 
 Interactive documentation available via **Swagger UI**:
 
@@ -140,17 +152,28 @@ http://127.0.0.1:8000/docs
 
 ---
 
+## Frontend Capabilities
+
+* **Meetings Dashboard:** Create, view, and search meetings
+* **Calendar View:** Visualize meetings by date
+* **Meeting Detail:** View transcript, decisions, actions, risks, participants
+* **Audio Upload:** Upload and transcribe recordings
+* **Integrations Page:** Connect Zoom, Teams, Google Meet and import recordings
+* **Ask AI:** Query meeting history with RAG
+* **PDF Export:** Download meeting summaries
+* **Email Notifications:** Automatic email summaries and action item assignments
+
+---
+
 ## AI Processing Pipeline
 
 1. Transcript fetched from relational database
 2. Text passed to AI extraction service
 3. LLM returns structured JSON:
-
    * decisions
    * action items
 4. Results persisted transactionally
 5. On AI failure:
-
    * fallback extraction used
    * API returns success
    * system state remains consistent
@@ -164,7 +187,6 @@ Ledger implements **defensive AI integration**:
 * AI calls wrapped in exception handling
 * Quota, authentication, and provider failures handled gracefully
 * Deterministic fallback ensures:
-
   * system availability
   * demo reliability
   * production safety
@@ -178,18 +200,22 @@ This approach mirrors real-world **resilient distributed systems**.
 * **Backend:** FastAPI
 * **ORM:** SQLAlchemy
 * **Database:** SQLite (development)
-* **AI / NLP:** OpenAI API (pluggable)
+* **AI / NLP:** OpenAI API (pluggable), Ollama (local LLM)
 * **API Spec:** OpenAPI / Swagger
-* **Language:** Python 3.9+
+* **Frontend:** React + TypeScript + Tailwind CSS
+* **Language:** Python 3.9+, Node.js
 
 ---
 
 ## Local Development
 
+### Backend
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+brew install ffmpeg
 uvicorn app.main:app --reload
 ```
 
@@ -197,7 +223,25 @@ Optional AI integration:
 
 ```bash
 export OPENAI_API_KEY=sk-...
+# For local LLM fallback
+export USE_OLLAMA=true
+ollama serve
 ```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## Integrations & OAuth
+
+* Add credentials for Zoom, Teams, Google, Slack in `.env`
+* Go to Integrations page to connect and import recordings
 
 ---
 
@@ -207,8 +251,8 @@ export OPENAI_API_KEY=sk-...
 * Idempotent extraction & versioning
 * Confidence scoring and explainability
 * PostgreSQL migration
-* Frontend dashboard (React)
 * SDKs for capture (desktop, browser, calendar)
+* Team/Organization support
 
 ---
 
@@ -224,3 +268,18 @@ Ledger demonstrates:
 
 It is designed to evolve into a **core intelligence component** within productivity and enterprise workflow platforms.
 
+---
+
+## License
+
+MIT License
+
+---
+
+## Support
+
+For questions or support, open an issue or contact the maintainer.
+
+---
+
+**Ledger** — Turn meetings into decisions, automatically.
