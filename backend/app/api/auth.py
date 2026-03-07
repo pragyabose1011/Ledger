@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
 import os
+import re
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -22,7 +23,38 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+# ── Email validation ─────────────────────────────────────────────────
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
+BLOCKED_DOMAINS = {
+    "example.com", "example.org", "example.net",
+    "test.com", "test.org", "test.net",
+    "mailinator.com", "guerrillamail.com", "tempmail.com",
+    "throwaway.email", "yopmail.com", "sharklasers.com",
+    "trashmail.com", "fakeinbox.com", "dispostable.com",
+    "getnada.com", "maildrop.cc", "10minutemail.com",
+    "temp-mail.org", "guerrillamailblock.com", "grr.la",
+    "tempail.com", "mohmal.com",
+}
+
+
+def validate_email(email: str) -> str:
+    """Validate email format and reject fake/disposable domains."""
+    email = email.strip().lower()
+
+    if not EMAIL_REGEX.match(email):
+        raise ValueError("Invalid email format")
+
+    domain = email.split("@")[1]
+    if domain in BLOCKED_DOMAINS:
+        raise ValueError(
+            f"'{domain}' is not allowed. Please use a real email address."
+        )
+
+    return email
+
+
+# ── DB dependency ────────────────────────────────────────────────────
 def get_db():
     db = SessionLocal()
     try:
@@ -31,6 +63,7 @@ def get_db():
         db.close()
 
 
+# ── Schemas ──────────────────────────────────────────────────────────
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -40,11 +73,25 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+    @validator("email")
+    def check_email(cls, v):
+        return validate_email(v)
+
 
 class SignupRequest(BaseModel):
     name: str
     email: str
     password: str
+
+    @validator("email")
+    def check_email(cls, v):
+        return validate_email(v)
+
+    @validator("password")
+    def check_password(cls, v):
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters")
+        return v
 
 
 class OAuthLoginRequest(BaseModel):
@@ -53,6 +100,7 @@ class OAuthLoginRequest(BaseModel):
     provider: str
 
 
+# ── Helpers ──────────────────────────────────────────────────────────
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -69,25 +117,17 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+# ── Routes ───────────────────────────────────────────────────────────
 @router.post("/signup", response_model=Token)
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     """Create a new user account."""
-    # Check if email already exists
     existing_user = db.query(User).filter(User.email == payload.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
-    
-    # Validate password
-    if len(payload.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 6 characters",
-        )
-    
-    # Create user
+
     user = User(
         name=payload.name,
         email=payload.email,
@@ -96,8 +136,7 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    
-    # Return token so user is logged in immediately
+
     access_token = create_access_token({"sub": user.id})
     return Token(access_token=access_token)
 
@@ -112,13 +151,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password",
         )
-    
+
     if user.password_hash is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please use OAuth login or reset your password",
         )
-    
+
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

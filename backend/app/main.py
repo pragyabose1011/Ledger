@@ -32,8 +32,10 @@ app.add_middleware(
 )
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
+USE_OLLAMA = os.getenv("USE_OLLAMA", "false").lower() == "true"
+
+if not OPENAI_API_KEY and not USE_OLLAMA:
+    raise ValueError("Either OPENAI_API_KEY or USE_OLLAMA=true must be set in the environment variables.")
 
 
 

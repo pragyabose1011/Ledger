@@ -1,60 +1,22 @@
 import os
-from openai import OpenAI
+import logging
 
-class DummyLLM:
-    class chat:
-        class completions:
-            @staticmethod
-            def create(*args, **kwargs):
-                return type(
-                    "Response",
-                    (),
-                    {
-                        "choices": [
-                            type(
-                                "Choice",
-                                (),
-                                {
-                                    "message": type(
-                                        "Msg",
-                                        (),
-                                        {
-                                            "content": """
-{
-  "decisions": [
-    { "summary": "Ship beta by Friday" }
-  ],
-  "action_items": [
-    {
-      "description": "Prepare announcement blog post",
-      "owner": "Alice",
-      "due_date": null
-    },
-    {
-      "description": "Test deployment and report issues",
-      "owner": "Bob",
-      "due_date": null
-    }
-  ]
-}
-"""
-                                        },
-                                    )
-                                },
-                            )
-                        ]
-                    },
-                )
+logger = logging.getLogger(__name__)
 
 
 def get_llm():
+    """Get the LLM client. Returns OpenAI client or None if using Ollama."""
+    use_ollama = os.getenv("USE_OLLAMA", "false").lower() == "true"
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️ OPENAI_API_KEY not set, using DummyLLM")
-        return DummyLLM()
 
-    try:
-        return OpenAI(api_key=api_key)
-    except Exception:
-        print("⚠️ OpenAI init failed, using DummyLLM")
-        return DummyLLM()
+    if use_ollama:
+        logger.info("🦙 USE_OLLAMA=true — OpenAI client not needed")
+        return None
+
+    if not api_key:
+        raise ValueError(
+            "OPENAI_API_KEY is not set. Either set it or use USE_OLLAMA=true"
+        )
+
+    from openai import OpenAI
+    return OpenAI(api_key=api_key)

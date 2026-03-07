@@ -71,27 +71,31 @@ def index_meeting_for_rag(db: Session, meeting_id: str):
         print(f"⚠️ RAG indexing failed (non-fatal): {e}")
 
 
+# ...existing code...
+
 @router.post("/")
 def extract(payload: ExtractRequest, db: Session = Depends(get_db)):
     transcript = db.query(Transcript).get(payload.transcript_id)
 
     if not transcript:
         raise HTTPException(status_code=404, detail="Transcript not found")
+
+    # get_llm() returns None when USE_OLLAMA=true
     try:
         llm = get_llm()
     except Exception as e:
+        # If no OpenAI key and not using Ollama, fail
         raise HTTPException(status_code=503, detail=str(e))
 
     try:
         process_transcript(db, llm, transcript)
-        
-        # Send email notifications after successful extraction
+
+        # ...existing code (notifications, RAG indexing)...
         try:
             send_post_extraction_notifications(db, transcript.meeting_id)
         except Exception as notify_err:
             print(f"⚠️ Notification error (non-fatal): {notify_err}")
-        
-        # Index for RAG after successful extraction
+
         try:
             index_meeting_for_rag(db, transcript.meeting_id)
         except Exception as rag_err:

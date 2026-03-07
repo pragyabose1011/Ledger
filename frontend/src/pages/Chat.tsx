@@ -27,7 +27,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [indexing, setIndexing] = useState(false);
-  const [useLocalLLM, setUseLocalLLM] = useState(false);
+  const [useLocalLLM, setUseLocalLLM] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -58,9 +58,10 @@ export default function ChatPage() {
       setIndexing(true);
       await api.post("/rag/index-all");
       await loadStats();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to index meetings", err);
-      alert("Failed to index meetings. Check console for details.");
+      const detail = err?.response?.data?.detail || err?.message || "Unknown error";
+      alert(`Failed to index meetings: ${detail}`);
     } finally {
       setIndexing(false);
     }
@@ -90,17 +91,28 @@ export default function ChatPage() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: res.data.answer,
-        sources: res.data.sources,
-        model: res.data.model,
+        content: res.data.answer || "No answer returned.",
+        sources: res.data.sources || [],
+        model: res.data.model || undefined,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
+      // Properly extract error message from backend response
+      let errorDetail = "An unexpected error occurred. Please try again.";
+      if (err?.response?.data?.detail) {
+        errorDetail =
+          typeof err.response.data.detail === "string"
+            ? err.response.data.detail
+            : JSON.stringify(err.response.data.detail);
+      } else if (err?.message) {
+        errorDetail = err.message;
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Sorry, I encountered an error: ${err.response?.data?.detail || err.message}`,
+        content: `Sorry, I encountered an error: ${errorDetail}`,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -117,7 +129,7 @@ export default function ChatPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-ledger-pink shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
+              <div className="h-8 w-8 rounded-full bg-pink-400 shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
               <span className="text-lg font-semibold tracking-tight">Ledger</span>
             </div>
             <span className="text-slate-600">•</span>
@@ -127,13 +139,13 @@ export default function ChatPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate("/meetings")}
-              className="text-sm text-slate-400 hover:text-ledger-pink transition-colors"
+              className="text-sm text-slate-400 hover:text-pink-400 transition-colors"
             >
               Meetings
             </button>
             <button
               onClick={() => navigate("/dashboard")}
-              className="text-sm text-slate-400 hover:text-ledger-pink transition-colors"
+              className="text-sm text-slate-400 hover:text-pink-400 transition-colors"
             >
               Dashboard
             </button>
@@ -159,14 +171,14 @@ export default function ChatPage() {
                 type="checkbox"
                 checked={useLocalLLM}
                 onChange={(e) => setUseLocalLLM(e.target.checked)}
-                className="rounded border-slate-600 bg-slate-800 text-ledger-pink focus:ring-ledger-pink"
+                className="rounded border-slate-600 bg-slate-800 text-pink-400 focus:ring-pink-400"
               />
               Use local LLM (Ollama)
             </label>
             <button
               onClick={handleIndexAll}
               disabled={indexing}
-              className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-ledger-pink hover:text-ledger-pink transition-colors disabled:opacity-50"
+              className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-pink-400 hover:text-pink-400 transition-colors disabled:opacity-50"
             >
               {indexing ? "Indexing..." : "Re-index all meetings"}
             </button>
@@ -196,7 +208,7 @@ export default function ChatPage() {
                   <button
                     key={suggestion}
                     onClick={() => setInput(suggestion)}
-                    className="rounded-full border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm text-slate-300 hover:border-ledger-pink hover:text-ledger-pink transition-colors"
+                    className="rounded-full border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm text-slate-300 hover:border-pink-400 hover:text-pink-400 transition-colors"
                   >
                     {suggestion}
                   </button>
@@ -213,7 +225,7 @@ export default function ChatPage() {
               <div
                 className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
-                    ? "bg-ledger-pink text-slate-950"
+                    ? "bg-pink-400 text-slate-950"
                     : "bg-slate-800/50 border border-slate-700"
                 }`}
               >
@@ -231,7 +243,7 @@ export default function ChatPage() {
                           className="block w-full text-left rounded-lg bg-slate-900/50 p-2 text-xs hover:bg-slate-900 transition-colors"
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-ledger-pink font-medium">
+                            <span className="text-pink-400 font-medium">
                               {source.meeting_title}
                             </span>
                             <span className="text-slate-500">
@@ -257,9 +269,15 @@ export default function ChatPage() {
             <div className="flex justify-start">
               <div className="bg-slate-800/50 border border-slate-700 rounded-2xl px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-ledger-pink animate-pulse" />
-                  <div className="h-2 w-2 rounded-full bg-ledger-pink animate-pulse delay-100" />
-                  <div className="h-2 w-2 rounded-full bg-ledger-pink animate-pulse delay-200" />
+                  <div className="h-2 w-2 rounded-full bg-pink-400 animate-pulse" />
+                  <div
+                    className="h-2 w-2 rounded-full bg-pink-400 animate-pulse"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                  <div
+                    className="h-2 w-2 rounded-full bg-pink-400 animate-pulse"
+                    style={{ animationDelay: "0.4s" }}
+                  />
                 </div>
               </div>
             </div>
@@ -278,13 +296,13 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask a question about your meetings..."
-              className="flex-1 rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-ledger-pink focus:outline-none focus:ring-2 focus:ring-ledger-pink/20"
+              className="flex-1 rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-400/20"
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="rounded-xl bg-ledger-pink px-6 py-3 text-sm font-medium text-slate-950 shadow-[0_0_20px_rgba(244,114,182,0.5)] hover:bg-pink-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-xl bg-pink-400 px-6 py-3 text-sm font-medium text-slate-950 shadow-[0_0_20px_rgba(244,114,182,0.5)] hover:bg-pink-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "..." : "Ask"}
             </button>
