@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { signup } from "../lib/api";
+import { signup, parseApiError } from "../lib/api";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -20,8 +20,24 @@ export default function SignupPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/\d/.test(password)) {
+      setError("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      setError("Password must contain at least one special character");
       return;
     }
 
@@ -31,7 +47,7 @@ export default function SignupPage() {
       await signup(name, email, password);
       navigate("/meetings");
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Signup failed");
+      setError(parseApiError(err, "Signup failed"));
     } finally {
       setLoading(false);
     }

@@ -7,6 +7,10 @@
   color-scheme: dark;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   @apply bg-slate-950 text-slate-100 antialiased;
   margin: 0;
@@ -16,3 +20,174 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* ── Custom scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(228, 133, 182, 0.25);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(228, 133, 182, 0.55);
+}
+
+/* ── Hero entrance ────────────────────────────────────────── */
+@keyframes heroFadeUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-animate {
+  animation: heroFadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-animate-delay-1 { animation-delay: 0.1s; }
+.hero-animate-delay-2 { animation-delay: 0.2s; }
+.hero-animate-delay-3 { animation-delay: 0.35s; }
+.hero-animate-delay-4 { animation-delay: 0.5s; }
+
+/* ── Scroll progress shimmer ──────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* ── Home page scroll snap ────────────────────────────────── */
+html.snap-home {
+  scroll-snap-type: y proximity;
+}
+html.snap-home section {
+  scroll-snap-align: start;
+  scroll-margin-top: 0px;
+}
+
+/* ── Light mode overrides ─────────────────────────────────── */
+/*
+  Color system:
+    Page bg  : #dde5f0  (muted blue-gray — cards stand out against this)
+    Card     : #ffffff  (white — clearly elevated above page)
+    Input bg : #f1f5f9  (very light, inside cards)
+    Raised   : #e8eef6  (slightly off-white for secondary panels)
+
+    Text-100 : #060d1a  (near-black, highest contrast)
+    Text-200 : #0f172a  (very dark)
+    Text-300 : #1e293b  (dark — nav links, labels)
+    Text-400 : #334155  (medium-dark — body copy, descriptions)
+    Text-500 : #4b5875  (muted but clearly readable)
+    Text-600 : #64748b  (subtle helper text)
+
+    Border   : #b8c8d8  (clear, visible)
+    Border-2 : #94a3b8  (stronger dividers)
+*/
+
+html.light {
+  color-scheme: light;
+}
+html.light body {
+  background-color: #dde5f0;
+  color: #060d1a;
+}
+
+/* ─ Solid backgrounds ─ */
+html.light .bg-slate-950 { background-color: #dde5f0 !important; }
+html.light .bg-slate-900 { background-color: #ffffff !important; }
+html.light .bg-slate-800 { background-color: #e8eef6 !important; }
+html.light .bg-slate-700 { background-color: #dde5f0 !important; }
+
+/* Sticky header with frosted glass */
+html.light .bg-slate-950\/80 { background-color: rgba(221,229,240,0.92) !important; }
+
+/* ─ Card opacity variants (rendered on page bg → should be clearly white) ─ */
+html.light .bg-slate-900\/80 { background-color: rgba(255,255,255,0.92) !important; }
+html.light .bg-slate-900\/70 { background-color: rgba(255,255,255,0.88) !important; }
+html.light .bg-slate-900\/60 { background-color: rgba(255,255,255,0.85) !important; }
+html.light .bg-slate-900\/50 { background-color: rgba(255,255,255,0.82) !important; }
+html.light .bg-slate-900\/40 { background-color: rgba(255,255,255,0.80) !important; }
+html.light .bg-slate-900\/30 { background-color: rgba(255,255,255,0.70) !important; }
+html.light .bg-slate-900\/20 { background-color: rgba(255,255,255,0.55) !important; }
+
+/* ─ Input / element opacity variants ─ */
+html.light .bg-slate-800\/60 { background-color: rgba(232,238,246,0.7) !important; }
+html.light .bg-slate-800\/50 { background-color: rgba(241,245,249,0.95) !important; }
+html.light .bg-slate-800\/40 { background-color: rgba(232,238,246,0.55) !important; }
+html.light .bg-slate-800\/20 { background-color: rgba(232,238,246,0.35) !important; }
+
+/* ─ Text — all significantly darker ─ */
+html.light .text-slate-50  { color: #060d1a !important; }
+html.light .text-slate-100 { color: #060d1a !important; }
+html.light .text-slate-200 { color: #0f172a !important; }
+html.light .text-slate-300 { color: #1e293b !important; }
+html.light .text-slate-400 { color: #334155 !important; }
+html.light .text-slate-500 { color: #4b5875 !important; }
+html.light .text-slate-600 { color: #64748b !important; }
+
+/* ─ Borders — clearly visible ─ */
+html.light .border-slate-800     { border-color: #b8c8d8 !important; }
+html.light .border-slate-700     { border-color: #94a3b8 !important; }
+html.light .border-slate-800\/80 { border-color: rgba(184,200,216,0.85) !important; }
+html.light .border-slate-800\/60 { border-color: rgba(184,200,216,0.65) !important; }
+html.light .border-slate-800\/50 { border-color: rgba(184,200,216,0.55) !important; }
+html.light .border-slate-700\/50 { border-color: rgba(148,163,184,0.55) !important; }
+
+/* ─ Inputs: white bg, dark text, visible border ─ */
+html.light input:not([type=file]),
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #060d1a !important;
+  border-color: #94a3b8 !important;
+}
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #7a8fa8 !important;
+}
+html.light select option {
+  background-color: #ffffff;
+  color: #060d1a;
+}
+
+/* ─ Hover states ─ */
+html.light .hover\:bg-slate-800:hover    { background-color: #dde5f0 !important; }
+html.light .hover\:bg-slate-800\/40:hover { background-color: rgba(221,229,240,0.6) !important; }
+html.light .group:hover .group-hover\:bg-ledger-pink\/20 { background-color: rgba(228,133,182,0.15) !important; }
+
+/* ─ Keep modal overlays, pink accents, status colors untouched ─ */
+html.light .bg-black\/60    { background-color: rgba(0,0,0,0.45) !important; }
+html.light .bg-ledger-pink\/10 { background-color: rgba(228,133,182,0.14) !important; }
+html.light .bg-ledger-pink\/5  { background-color: rgba(228,133,182,0.08) !important; }
+
+/* ─ Radial gradient glows: tone down in light mode ─ */
+html.light .bg-\[radial-gradient\(circle_at_top_right\2c _rgba\(244\2c 114\2c 182\2c 0\.1\)\2c _transparent_50\%\)\] {
+  background: radial-gradient(circle at top right, rgba(228,133,182,0.08), transparent 50%) !important;
+}
+html.light .bg-\[radial-gradient\(circle_at_top\2c _rgba\(244\2c 114\2c 182\2c 0\.14\)\2c _transparent_55\%\)\2c _radial-gradient\(circle_at_bottom\2c _rgba\(56\2c 189\2c 248\2c 0\.08\)\2c _transparent_55\%\)\] {
+  background: radial-gradient(circle at top, rgba(228,133,182,0.09), transparent 55%) !important;
+}
+
+/* ── Scroll-triggered animation ───────────────────────────── */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.scroll-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.scroll-reveal.delay-50  { transition-delay: 50ms; }
+.scroll-reveal.delay-100 { transition-delay: 100ms; }
+.scroll-reveal.delay-150 { transition-delay: 150ms; }
+.scroll-reveal.delay-200 { transition-delay: 200ms; }
+.scroll-reveal.delay-250 { transition-delay: 250ms; }
+.scroll-reveal.delay-300 { transition-delay: 300ms; }
+.scroll-reveal.delay-350 { transition-delay: 350ms; }
+.scroll-reveal.delay-400 { transition-delay: 400ms; }
+.scroll-reveal.delay-450 { transition-delay: 450ms; }
+.scroll-reveal.delay-500 { transition-delay: 500ms; }
+.scroll-reveal.delay-550 { transition-delay: 550ms; }
+.scroll-reveal.delay-600 { transition-delay: 600ms; }

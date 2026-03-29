@@ -49,22 +49,21 @@ def send_post_extraction_notifications(db: Session, meeting_id: str):
 def index_meeting_for_rag(db: Session, meeting_id: str):
     """Index meeting transcript for RAG after extraction."""
     try:
-        from app.services.rag import index_meeting
-        
+        from app.services.rag import index_transcript
+
         meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
         if not meeting:
             return
-        
+
         transcript = db.query(Transcript).filter(Transcript.meeting_id == meeting_id).first()
         if not transcript:
             return
-        
-        index_meeting(
+
+        index_transcript(
             meeting_id=meeting.id,
+            transcript_text=transcript.content,
             meeting_title=meeting.title,
-            transcript=transcript.content,
-            user_id=meeting.owner_id,
-            meeting_date=meeting.created_at,
+            meeting_date=str(meeting.created_at),
         )
         print(f"✅ Auto-indexed meeting for RAG: {meeting.title}")
     except Exception as e:
@@ -75,7 +74,7 @@ def index_meeting_for_rag(db: Session, meeting_id: str):
 
 @router.post("/")
 def extract(payload: ExtractRequest, db: Session = Depends(get_db)):
-    transcript = db.query(Transcript).get(payload.transcript_id)
+    transcript = db.query(Transcript).filter(Transcript.id == payload.transcript_id).first()
 
     if not transcript:
         raise HTTPException(status_code=404, detail="Transcript not found")

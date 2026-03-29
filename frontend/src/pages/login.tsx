@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { login, api } from "../lib/api";
+import { login, api, parseApiError } from "../lib/api";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 
 type OAuthStatus = {
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [oauthStatus, setOauthStatus] = useState<OAuthStatus | null>(null);
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function LoginPage() {
     if (token) {
       // Send token to extension
       try {
-        chrome.runtime?.sendMessage?.({ type: 'SAVE_TOKEN', token });
+        (window as any).chrome?.runtime?.sendMessage?.({ type: 'SAVE_TOKEN', token });
       } catch (e) {
         // Not in extension context
       }
@@ -38,6 +39,10 @@ export default function LoginPage() {
     const oauthError = searchParams.get("error");
     if (oauthError) {
       setError(oauthError);
+    }
+
+    if (searchParams.get("reset") === "1") {
+      setSuccessMsg("Password reset successfully! You can now sign in.");
     }
 
     // Check which OAuth providers are available
@@ -55,14 +60,14 @@ export default function LoginPage() {
       await login(email, password);
       navigate("/meetings");
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Login failed");
+      setError(parseApiError(err, "Login failed"));
     } finally {
       setLoading(false);
     }
   };
 
   const handleOAuth = (provider: string) => {
-    window.location.href = `http://localhost:8000/oauth/${provider}/login`;
+    window.location.href = `/oauth/${provider}/login`;
   };
 
   return (
@@ -147,6 +152,11 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {successMsg && (
+              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-400">
+                {successMsg}
+              </div>
+            )}
             {error && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
                 {error}
@@ -186,7 +196,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
+          <p className="mt-4 text-center text-sm text-slate-400">
+            <Link to="/forgot-password" className="text-ledger-pink hover:underline">
+              Forgot password?
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm text-slate-400">
             Don't have an account?{" "}
             <Link to="/signup" className="text-ledger-pink hover:underline">
               Sign up

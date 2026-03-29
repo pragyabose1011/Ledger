@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
@@ -117,11 +117,26 @@ export default function MeetingDetailPage() {
   const [transcriptText, setTranscriptText] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  // Add near other useState declarations:
   const [showAudioUpload, setShowAudioUpload] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+
+  // Live recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [interimText, setInterimText] = useState("");
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    summary: string;
+    questions: string[];
+    action_items: string[];
+    decisions: string[];
+  } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const aiIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveTranscriptRef = useRef("");
+  const liveScrollRef = useRef<HTMLDivElement>(null);
 
   // Add near other handler functions:
 
@@ -165,6 +180,121 @@ export default function MeetingDetailPage() {
     } finally {
       setUploadingAudio(false);
       setUploadProgress("");
+    }
+  };
+
+  // Keep ref in sync so interval closure always reads current transcript
+  useEffect(() => {
+    liveTranscriptRef.current = liveTranscript;
+    if (liveScrollRef.current) {
+      liveScrollRef.current.scrollTop = liveScrollRef.current.scrollHeight;
+    }
+  }, [liveTranscript]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
+      if (aiIntervalRef.current) clearInterval(aiIntervalRef.current);
+    };
+  }, []);
+
+  const fetchAiSuggestions = async () => {
+    if (liveTranscriptRef.current.length < 40) return;
+    setAiLoading(true);
+    try {
+      const res = await api.post("/live/assist", {
+        transcript: liveTranscriptRef.current,
+        meeting_title: meeting?.title || "Meeting",
+      });
+      setAiSuggestions(res.data);
+    } catch (err) {
+      console.error("AI assist failed", err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const startRecording = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Live recording requires Chrome or Edge. Firefox is not supported.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (e: any) => {
+      let interim = "";
+      let finalChunk = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalChunk += t + " ";
+        else interim += t;
+      }
+      if (finalChunk) setLiveTranscript((prev) => prev + finalChunk);
+      setInterimText(interim);
+    };
+
+    recognition.onerror = (e: any) => {
+      if (e.error === "no-speech") return;
+      console.error("Speech recognition error", e.error);
+    };
+
+    // Auto-restart on silence (Web Speech API stops after a pause)
+    recognition.onend = () => {
+      if (recognitionRef.current) {
+        try { recognition.start(); } catch (_) {}
+      }
+    };
+
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsRecording(true);
+    setLiveTranscript("");
+    setInterimText("");
+    setAiSuggestions(null);
+
+    // Poll AI every 15 seconds
+    aiIntervalRef.current = setInterval(fetchAiSuggestions, 15000);
+  };
+
+  const stopRecording = async () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
+      try { recognitionRef.current.stop(); } catch (_) {}
+      recognitionRef.current = null;
+    }
+    if (aiIntervalRef.current) {
+      clearInterval(aiIntervalRef.current);
+      aiIntervalRef.current = null;
+    }
+    setIsRecording(false);
+    setInterimText("");
+
+    const finalTranscript = liveTranscriptRef.current.trim();
+    if (finalTranscript.length < 10) return;
+
+    try {
+      setUploading(true);
+      const res = await api.post("/transcripts/", {
+        meeting_id: id,
+        content: `Live Recording\n\n${finalTranscript}`,
+      });
+      await api.post("/extract/", { transcript_id: res.data.transcript_id });
+      setLiveTranscript("");
+      await fetchAll();
+    } catch (err) {
+      console.error("Failed to save live transcript", err);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -496,6 +626,29 @@ export default function MeetingDetailPage() {
     </div>
   </div>
 )}
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 ${
+                isRecording
+                  ? "bg-red-500 hover:bg-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                  : "border border-slate-700 text-slate-300 hover:border-ledger-pink hover:text-ledger-pink"
+              }`}
+            >
+              {isRecording ? (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                  Stop Recording
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  Record Live
+                </>
+              )}
+            </button>
+
             <button
               onClick={runExtraction}
               disabled={extracting || !meeting.transcript_id}
@@ -831,6 +984,104 @@ export default function MeetingDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Live Recording Panel */}
+      {isRecording && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur-md shadow-2xl"
+          style={{ maxHeight: "45vh" }}>
+          {/* Header bar */}
+          <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+            <div className="flex items-center gap-3">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-semibold text-slate-100">Recording Live</span>
+              <span className="text-xs text-slate-500">{liveTranscript.split(" ").filter(Boolean).length} words</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {aiLoading && (
+                <div className="flex items-center gap-1.5 text-xs text-ledger-pink">
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
+                  AI thinking…
+                </div>
+              )}
+              <button
+                onClick={stopRecording}
+                className="rounded-full bg-red-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-400 transition-colors"
+              >
+                Stop & Save
+              </button>
+            </div>
+          </div>
+
+          <div className="flex h-full" style={{ height: "calc(45vh - 53px)" }}>
+            {/* Live transcript */}
+            <div className="flex-1 overflow-y-auto p-4" ref={liveScrollRef}>
+              <p className="text-sm leading-relaxed text-slate-300 whitespace-pre-wrap">
+                {liveTranscript}
+                {interimText && (
+                  <span className="text-slate-500 italic">{interimText}</span>
+                )}
+                {!liveTranscript && !interimText && (
+                  <span className="text-slate-600">Listening… start speaking to see your transcript here.</span>
+                )}
+              </p>
+            </div>
+
+            {/* AI suggestions sidebar */}
+            <div className="w-80 shrink-0 border-l border-slate-800 overflow-y-auto p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-ledger-pink">AI Suggestions</p>
+              {!aiSuggestions && !aiLoading && (
+                <p className="text-xs text-slate-600">Suggestions appear after ~15 seconds of speech.</p>
+              )}
+              {aiSuggestions && (
+                <div className="space-y-4">
+                  {aiSuggestions.summary && (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-slate-400">Summary</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{aiSuggestions.summary}</p>
+                    </div>
+                  )}
+                  {aiSuggestions.decisions.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-emerald-400">Decisions</p>
+                      <ul className="space-y-1">
+                        {aiSuggestions.decisions.map((d, i) => (
+                          <li key={i} className="text-xs text-slate-300 flex gap-1.5">
+                            <span className="text-emerald-500 shrink-0">✓</span>{d}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {aiSuggestions.action_items.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-amber-400">Action Items</p>
+                      <ul className="space-y-1">
+                        {aiSuggestions.action_items.map((a, i) => (
+                          <li key={i} className="text-xs text-slate-300 flex gap-1.5">
+                            <span className="text-amber-500 shrink-0">◆</span>{a}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {aiSuggestions.questions.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-blue-400">Open Questions</p>
+                      <ul className="space-y-1">
+                        {aiSuggestions.questions.map((q, i) => (
+                          <li key={i} className="text-xs text-slate-300 flex gap-1.5">
+                            <span className="text-blue-500 shrink-0">?</span>{q}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Transcript Modal */}
       {showUploadModal && (

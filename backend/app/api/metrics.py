@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from datetime import datetime, timedelta
@@ -9,6 +9,8 @@ from app.db.models.decision import Decision
 from app.db.models.action_item import ActionItem
 from app.db.models.transcript import Transcript
 from app.db.models.alert import Alert
+from app.db.models.user import User
+from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
@@ -177,4 +179,50 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
         "productivity_score": productivity_score,
         "weekly_metrics": weekly_metrics,
         "alerts": alert_list,
+    }
+
+
+@router.get("/meeting/{meeting_id}")
+def get_meeting_metrics(
+    meeting_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Per-meeting productivity metrics."""
+    from app.db.models.user import User as UserModel
+    meeting = db.query(Meeting).filter(
+        Meeting.id == meeting_id,
+        Meeting.owner_id == current_user.id,
+    ).first()
+    if not meeting:
+        raise HTTPException(404, "Meeting not found")
+
+    decisions = db.query(Decision).filter(Decision.meeting_id == meeting_id).all()
+    actions = db.query(ActionItem).filter(ActionItem.meeting_id == meeting_id).all()
+
+    completed = sum(1 for a in actions if a.status == "done")
+    with_owner = sum(1 for a in actions if a.owner_id)
+    total = len(decisions) + len(actions)
+
+    if total > 0:
+        score = round((len(decisions) + completed) / total * 10, 1)
+    else:
+        score = 0.0
+
+    if score >= 7:
+        classification = "productive"
+    elif score >= 4:
+        classification = "average"
+    else:
+        classification = "unproductive"
+
+    return {
+        "meeting_id": meeting_id,
+        "decisions": len(decisions),
+        "action_items": len(actions),
+        "productivity_score": score,
+        "classification": classification,
+        "actions_with_owner": with_owner,
+        "actions_without_owner": len(actions) - with_owner,
+        "has_outcomes": total > 0,
     }

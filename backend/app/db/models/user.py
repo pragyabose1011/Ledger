@@ -12,6 +12,11 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     role = Column(String, nullable=True)
-    password_hash = Column(String, nullable=True)  # ← add this
+    password_hash = Column(String, nullable=True)
+    avatar_url = Column(String, nullable=True)
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     action_items = relationship("ActionItem", back_populates="owner")

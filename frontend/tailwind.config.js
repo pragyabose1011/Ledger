@@ -8,7 +8,7 @@ export default {
     extend: {
       colors: {
         // tweak this hex to the exact pink you like
-        "ledger-pink": "#f472b6",
+        "ledger-pink": "#e485b6",
       },
     },
   },

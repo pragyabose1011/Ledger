@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+venv/
+.venv/
+*.db
+*.sqlite3
+chroma_db/
+.git/
+.github/
+tests/
+*.md
+.DS_Store

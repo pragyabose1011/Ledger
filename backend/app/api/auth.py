@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import os
 import re
+import secrets
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,6 +37,21 @@ BLOCKED_DOMAINS = {
     "temp-mail.org", "guerrillamailblock.com", "grr.la",
     "tempail.com", "mohmal.com",
 }
+
+
+def validate_password(password: str) -> str:
+    """Shared password strength validator."""
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not re.search(r"\d", password):
+        raise ValueError("Password must contain at least one number")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        raise ValueError("Password must contain at least one special character")
+    return password
 
 
 def validate_email(email: str) -> str:
@@ -75,7 +91,7 @@ class LoginRequest(BaseModel):
 
     @validator("email")
     def check_email(cls, v):
-        return validate_email(v)
+        return v.strip().lower()
 
 
 class SignupRequest(BaseModel):
@@ -89,9 +105,7 @@ class SignupRequest(BaseModel):
 
     @validator("password")
     def check_password(cls, v):
-        if len(v) < 6:
-            raise ValueError("Password must be at least 6 characters")
-        return v
+        return validate_password(v)
 
 
 class OAuthLoginRequest(BaseModel):
@@ -184,6 +198,76 @@ def oauth_login(payload: OAuthLoginRequest, db: Session = Depends(get_db)):
         "provider": payload.provider,
     })
     return Token(access_token=access_token)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @validator("new_password")
+    def check_password(cls, v):
+        return validate_password(v)
+
+
+@router.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Generate a password reset token. In dev, returns the token directly."""
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    # Always return 200 to avoid email enumeration
+    if not user:
+        return {"message": "If that email exists, a reset link has been sent."}
+
+    token = secrets.token_urlsafe(32)
+    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    user.password_reset_token = token
+    user.password_reset_expires = expires
+    db.commit()
+
+    # Try to send email; fall back to returning token in dev
+    from app.services.email_notifier import send_email, is_email_configured
+    reset_url = f"{os.environ.get('FRONTEND_URL', 'http://localhost:5173')}/reset-password?token={token}"
+
+    if is_email_configured():
+        send_email(
+            to=user.email,
+            subject="[Ledger] Reset your password",
+            body=f"Hi {user.name},\n\nClick the link below to reset your password (expires in 1 hour):\n\n{reset_url}\n\nIf you didn't request this, ignore this email.\n\n— Ledger",
+        )
+        return {"message": "If that email exists, a reset link has been sent."}
+    else:
+        # Dev mode: return token so it can be tested without email
+        return {"message": "Email not configured. Use the token below for testing.", "dev_token": token, "reset_url": reset_url}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using a valid token."""
+    now = datetime.now(timezone.utc)
+    user = db.query(User).filter(User.password_reset_token == payload.token).first()
+
+    if not user:
+        raise HTTPException(400, "Invalid or expired reset token")
+
+    expires = user.password_reset_expires
+    if expires is None:
+        raise HTTPException(400, "Invalid or expired reset token")
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if now > expires:
+        raise HTTPException(400, "Reset token has expired")
+
+    user.password_hash = get_password_hash(payload.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.commit()
+
+    return {"message": "Password reset successfully. You can now log in."}
 
 
 def get_current_user(

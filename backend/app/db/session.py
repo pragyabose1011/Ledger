@@ -1,3 +1,4 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -9,23 +10,22 @@ from app.db.models.decision import Decision  # noqa
 from app.db.models.action_item import ActionItem  # noqa
 from app.db.models.transcript import Transcript  # noqa
 from app.db.base import Base
-from app.db.models.alert import Alert  # noqa  # add this
-from app.db.models.risk import Risk  # noqa  # add this
+from app.db.models.alert import Alert  # noqa
+from app.db.models.risk import Risk  # noqa
+from app.db.models.colleague import Colleague  # noqa
+from app.db.models.message import Message  # noqa
 
-DATABASE_URL = "sqlite:///./ledger.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/ledger.db")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+# SQLite needs check_same_thread=False; MySQL does not
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 Base.metadata.create_all(bind=engine)
 
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
     db = SessionLocal()
@@ -33,4 +33,3 @@ def get_db():
         yield db
     finally:
         db.close()
-

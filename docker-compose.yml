@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: ledger-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ledgerroot
+      MYSQL_DATABASE: ledger
+      MYSQL_USER: ledger
+      MYSQL_PASSWORD: ledgerpass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - ledger-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uledger", "-pledgerpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ledger-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=mysql+pymysql://ledger:ledgerpass@ledger-db:3306/ledger
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - FRONTEND_URL=http://localhost
+    volumes:
+      - chroma-data:/app/chroma_db
+      - uploads-data:/app/uploads
+    networks:
+      - ledger-net
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ledger-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ledger-net
+    restart: unless-stopped
+
+networks:
+  ledger-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  chroma-data:
+  uploads-data:
