@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import Layout from "../components/Layout";
 
 type Message = {
   id: string;
@@ -121,37 +122,8 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
-
-      {/* Header */}
-      <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-10">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-pink-400 shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
-              <span className="text-lg font-semibold tracking-tight">Ledger</span>
-            </div>
-            <span className="text-slate-600">•</span>
-            <span className="text-sm text-slate-400">Ask your meetings</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/meetings")}
-              className="text-sm text-slate-400 hover:text-pink-400 transition-colors"
-            >
-              Meetings
-            </button>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-sm text-slate-400 hover:text-pink-400 transition-colors"
-            >
-              Dashboard
-            </button>
-          </div>
-        </div>
-      </header>
+    <Layout>
+      <div className="flex flex-col min-h-screen">
 
       {/* Stats Bar */}
       <div className="relative border-b border-slate-800/50 bg-slate-900/30">
@@ -309,6 +281,7 @@ export default function ChatPage() {
           </div>
         </form>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }

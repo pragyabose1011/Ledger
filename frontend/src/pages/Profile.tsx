@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useTheme } from "../context/ThemeContext";
+import Layout from "../components/Layout";
 
 type Profile = {
   id: string;
@@ -56,8 +57,10 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "chat", label: "Messages" },
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const WS_BASE = API_BASE.replace(/^http/, "ws");
+const API_BASE = import.meta.env.VITE_API_URL || "";
+const WS_BASE = API_BASE
+  ? API_BASE.replace(/^http/, "ws")
+  : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
 
 function Avatar({
   url,
@@ -330,31 +333,17 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
-      </div>
+      <Layout>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.08),_transparent_50%)]" />
-
-      {/* Header */}
-      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <button
-            onClick={() => navigate("/meetings")}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <div className="h-7 w-7 rounded-full bg-ledger-pink shadow-[0_0_20px_rgba(244,114,182,0.6)]" />
-            <span className="font-semibold">Ledger</span>
-          </button>
-          <span className="text-sm text-slate-400">Profile Settings</span>
-        </div>
-      </header>
-
-      <main className="relative mx-auto max-w-5xl px-6 py-10">
+    <Layout>
+      <div className="mx-auto max-w-5xl px-8 py-8">
         {/* Profile hero */}
         <div className="mb-8 flex items-center gap-6">
           <div className="relative">
@@ -871,7 +860,7 @@ export default function Profile() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }

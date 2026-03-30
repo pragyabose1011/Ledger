@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import Layout from "../components/Layout";
 
 type IntegrationStatus = {
   configured: boolean;
@@ -123,40 +124,8 @@ export default function IntegrationsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
-
-      <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-ledger-pink shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
-            <span className="text-lg font-semibold tracking-tight">Ledger</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/meetings")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Meetings
-            </button>
-            <button
-              onClick={() => navigate("/calendar")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Calendar
-            </button>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Dashboard
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="relative mx-auto max-w-7xl px-6 py-10">
+    <Layout>
+      <div className="px-8 py-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold">Integrations</h1>
           <p className="mt-1 text-sm text-slate-400">
@@ -279,7 +248,7 @@ export default function IntegrationsPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }

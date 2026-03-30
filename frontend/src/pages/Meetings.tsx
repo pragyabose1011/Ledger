@@ -1,6 +1,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import Layout from "../components/Layout";
+import { useToast } from "../context/ToastContext";
+import { MeetingsPageSkeleton } from "../components/Skeleton";
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+const platformColors: Record<string, string> = {
+  Zoom: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  "Google Meet": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  "Microsoft Teams": "bg-purple-500/10 text-purple-400 border-purple-500/20",
+};
 
 type Meeting = {
   id: string;
@@ -17,12 +37,14 @@ export default function Meetings() {
   const [platform, setPlatform] = useState("Zoom");
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [platformFilter, setPlatformFilter] = useState("");
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const loadMeetings = async (query?: string, platformF?: string) => {
     try {
@@ -38,6 +60,7 @@ export default function Meetings() {
       console.error("Failed to load meetings", err);
     } finally {
       setSearching(false);
+      setInitialLoading(false);
     }
   };
 
@@ -68,15 +91,9 @@ export default function Meetings() {
     return () => clearTimeout(timer);
   }, [searchQuery, platformFilter]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    setMeetings([]);
-    navigate("/login");
-  };
-
   const handleCreate = async () => {
     if (!title.trim()) {
-      alert("Please enter a meeting title");
+      toast("Please enter a meeting title", "warning");
       return;
     }
 
@@ -89,7 +106,7 @@ export default function Meetings() {
       navigate(`/meetings/${res.data.meeting_id}`);
     } catch (err) {
       console.error("Failed to create meeting", err);
-      alert("Failed to create meeting");
+      toast("Failed to create meeting", "error");
     } finally {
       setCreating(false);
     }
@@ -102,70 +119,17 @@ export default function Meetings() {
 
   const hasFilters = searchQuery || platformFilter;
 
+  if (initialLoading) {
+    return (
+      <Layout>
+        <MeetingsPageSkeleton />
+      </Layout>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
-
-      <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-ledger-pink shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
-            <span className="text-lg font-semibold tracking-tight">Ledger</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            
-<button
-  onClick={() => navigate("/integrations")}
-  className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
->
-  Integrations
-</button>
-            <button
-              onClick={() => navigate("/chat")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Ask AI
-            </button>
-            <button
-              onClick={() => navigate("/calendar")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Calendar
-            </button>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Home
-            </button>
-            <button
-              onClick={() => navigate("/profile")}
-              className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-800 border border-slate-700 hover:border-ledger-pink transition-colors"
-              title="Profile"
-            >
-              <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-              </svg>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="rounded-full border border-slate-700 px-4 py-1.5 text-sm text-slate-300 hover:border-ledger-pink hover:text-ledger-pink transition-colors"
-            >
-              Log out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="relative mx-auto max-w-7xl px-6 py-10">
+    <Layout>
+      <div className="px-8 py-8 max-w-7xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold">Meetings</h1>
@@ -279,32 +243,27 @@ export default function Meetings() {
                 onClick={() => navigate(`/meetings/${m.id}`)}
                 className="group rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 text-left backdrop-blur transition-all hover:border-ledger-pink/50 hover:shadow-[0_0_30px_rgba(244,114,182,0.15)]"
               >
-                <div className="mb-3 flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ledger-pink/10 text-ledger-pink shadow-[0_0_20px_rgba(244,114,182,0.3)]">
-                    <span className="text-xl">📊</span>
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ledger-pink/10">
+                    <svg className="h-5 w-5 text-ledger-pink" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
                   </div>
-                  <div className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">
-                    {m.platform || "Platform"}
+                  <div className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${platformColors[m.platform || ""] || "bg-slate-800/60 text-slate-400 border-slate-700"}`}>
+                    {m.platform || "Other"}
                   </div>
                 </div>
 
-                <h3 className="mb-2 text-lg font-medium text-slate-100 group-hover:text-ledger-pink transition-colors">
+                <h3 className="mb-2 text-base font-medium text-slate-100 group-hover:text-ledger-pink transition-colors line-clamp-2">
                   {m.title}
                 </h3>
 
-                <p className="text-sm text-slate-400">
-                  {new Date(m.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </p>
+                <p className="text-xs text-slate-500">{timeAgo(m.created_at)}</p>
               </button>
             ))}
           </div>
         )}
-      </main>
+      </div>
 
       {/* Create Meeting Modal */}
       {showModal && (
@@ -354,6 +313,6 @@ export default function Meetings() {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import Layout from "../components/Layout";
+import { useToast } from "../context/ToastContext";
 
 type Participant = {
   id: string;
@@ -103,6 +105,7 @@ function parseTranscriptLine(line: string): { speaker: string | null; message: s
 export default function MeetingDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -142,7 +145,7 @@ export default function MeetingDetailPage() {
 
   const handleAudioUpload = async () => {
     if (!audioFile) {
-      alert("Please select an audio file");
+      toast("Please select an audio file", "warning");
       return;
     }
 
@@ -173,10 +176,10 @@ export default function MeetingDetailPage() {
       setUploadProgress("");
       await fetchAll();
       
-      alert("Audio transcribed and extracted successfully!");
+      toast("Audio transcribed and extracted successfully!", "success");
     } catch (err: any) {
       console.error("Audio upload failed", err);
-      alert(err.response?.data?.detail || "Failed to upload and transcribe audio");
+      toast(err?.response?.data?.detail || "Failed to transcribe audio", "error");
     } finally {
       setUploadingAudio(false);
       setUploadProgress("");
@@ -222,7 +225,7 @@ export default function MeetingDetailPage() {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Live recording requires Chrome or Edge. Firefox is not supported.");
+      toast("Live recording requires Chrome or Edge", "warning");
       return;
     }
 
@@ -333,7 +336,7 @@ export default function MeetingDetailPage() {
 
   const runExtraction = async () => {
     if (!meeting?.transcript_id) {
-      alert("No transcript found. Please upload a transcript first.");
+      toast("Please upload a transcript first", "warning");
       return;
     }
 
@@ -343,7 +346,7 @@ export default function MeetingDetailPage() {
       await fetchAll();
     } catch (err) {
       console.error(err);
-      alert("Extraction failed. Check backend logs.");
+      toast("Extraction failed — check backend logs", "error");
     } finally {
       setExtracting(false);
     }
@@ -363,7 +366,7 @@ export default function MeetingDetailPage() {
       const res = await api.get(`/meetings/${id}`);
       setMeeting(res.data);
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to add participant");
+      toast(err.response?.data?.detail || "Failed to add participant", "error");
     } finally {
       setAddingParticipant(false);
     }
@@ -377,13 +380,13 @@ export default function MeetingDetailPage() {
       const res = await api.get(`/meetings/${id}`);
       setMeeting(res.data);
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to remove participant");
+      toast(err.response?.data?.detail || "Failed to remove participant", "error");
     }
   };
 
   const handleUploadTranscript = async () => {
     if (!transcriptText.trim()) {
-      alert("Please paste a transcript");
+      toast("Please paste a transcript", "warning");
       return;
     }
 
@@ -399,7 +402,7 @@ export default function MeetingDetailPage() {
       await fetchAll();
     } catch (err) {
       console.error("Failed to upload transcript", err);
-      alert("Failed to upload transcript");
+      toast("Failed to upload transcript", "error");
     } finally {
       setUploading(false);
     }
@@ -445,7 +448,7 @@ export default function MeetingDetailPage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to export PDF", err);
-      alert("Failed to export PDF");
+      toast("Failed to export PDF", "error");
     } finally {
       setExporting(false);
     }
@@ -453,9 +456,14 @@ export default function MeetingDetailPage() {
 
   if (loading || !meeting) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <p className="text-slate-400">Loading meeting…</p>
-      </div>
+      <Layout>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
+            <span className="text-slate-400 text-sm">Loading meeting…</span>
+          </div>
+        </div>
+      </Layout>
     );
   }
 
@@ -480,187 +488,123 @@ export default function MeetingDetailPage() {
   const speakers = [...new Set(transcriptLines.map((l) => l.speaker).filter((s): s is string => Boolean(s)))];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
-
-      <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-10">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-ledger-pink shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
-              <span className="text-lg font-semibold tracking-tight">Ledger</span>
-            </div>
-            <span className="text-slate-600">•</span>
-            <button onClick={() => navigate("/meetings")} className="text-sm text-slate-400 hover:text-ledger-pink transition-colors">
-              ← Back to meetings
+    <Layout>
+      {/* Page header bar */}
+      <div className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+        <div className="flex items-center justify-between px-8 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/meetings")}
+              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-100 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+              Meetings
             </button>
+            <span className="text-slate-700">/</span>
+            <span className="text-sm text-slate-300 font-medium truncate max-w-xs">{meeting.title}</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {meeting.has_extractions && (
-              <button
-                onClick={handleExportPDF}
-                disabled={exporting}
-                className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:border-ledger-pink hover:text-ledger-pink transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {exporting ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Exporting…
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export PDF
-                  </>
-                )}
-              </button>
-            )}
-
-            {!meeting.transcript_id && (
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="rounded-full border border-ledger-pink px-4 py-2 text-sm font-medium text-ledger-pink hover:bg-ledger-pink hover:text-slate-950 transition-colors"
-              >
-                Upload Transcript
-              </button>
-            )}
-           
-
-{!meeting.transcript_id && (
-  <>
-    <button
-      onClick={() => setShowUploadModal(true)}
-      className="rounded-full border border-ledger-pink px-4 py-2 text-sm font-medium text-ledger-pink hover:bg-ledger-pink hover:text-slate-950 transition-colors"
-    >
-      Upload Transcript
-    </button>
-    <button
-      onClick={() => setShowAudioUpload(true)}
-      className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:border-ledger-pink hover:text-ledger-pink transition-colors flex items-center gap-2"
-    >
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-      </svg>
-      Upload Audio
-    </button>
-  </>
-)}
-
-
-
-{/* Audio Upload Modal */}
-{showAudioUpload && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-      <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
-        <svg className="w-6 h-6 text-ledger-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-        </svg>
-        Upload Audio/Video
-      </h2>
-      
-      <p className="mb-4 text-sm text-slate-400">
-        Upload a recording and we'll automatically transcribe it using AI.
-      </p>
-
-      <div className="mb-4">
-        <label className="mb-2 block text-sm text-slate-300">Select file</label>
-        <input
-          type="file"
-          accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.ogg"
-          onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-slate-100 file:mr-4 file:rounded-full file:border-0 file:bg-ledger-pink file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-950 hover:file:bg-pink-400"
-        />
-        <p className="mt-2 text-xs text-slate-500">
-          Supported: MP3, MP4, WAV, M4A, WebM, OGG • Max 25MB
-        </p>
-      </div>
-
-      {audioFile && (
-        <div className="mb-4 rounded-lg border border-slate-700 bg-slate-800/30 p-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ledger-pink/20 text-ledger-pink">
-              🎵
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-slate-200 truncate">{audioFile.name}</p>
-              <p className="text-xs text-slate-500">
-                {(audioFile.size / (1024 * 1024)).toFixed(2)} MB
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {uploadProgress && (
-        <div className="mb-4 rounded-lg border border-ledger-pink/30 bg-ledger-pink/5 p-3">
           <div className="flex items-center gap-2">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
-            <p className="text-sm text-ledger-pink">{uploadProgress}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button
-          onClick={() => {
-            setShowAudioUpload(false);
-            setAudioFile(null);
-          }}
-          disabled={uploadingAudio}
-          className="flex-1 rounded-lg border border-slate-700 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleAudioUpload}
-          disabled={uploadingAudio || !audioFile}
-          className="flex-1 rounded-lg bg-ledger-pink px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-pink-400 transition-colors disabled:opacity-50"
-        >
-          {uploadingAudio ? "Processing..." : "Transcribe"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            {!meeting.transcript_id && (
+              <>
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="rounded-lg border border-ledger-pink/60 px-3 py-1.5 text-sm font-medium text-ledger-pink hover:bg-ledger-pink/10 transition-colors"
+                >
+                  Upload Transcript
+                </button>
+                <button
+                  onClick={() => setShowAudioUpload(true)}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-500 transition-colors flex items-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  Upload Audio
+                </button>
+              </>
+            )}
             <button
               onClick={isRecording ? stopRecording : startRecording}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 ${
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 isRecording
-                  ? "bg-red-500 hover:bg-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                  ? "bg-red-500 hover:bg-red-400 text-white"
                   : "border border-slate-700 text-slate-300 hover:border-ledger-pink hover:text-ledger-pink"
               }`}
             >
               {isRecording ? (
-                <>
-                  <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                  Stop Recording
-                </>
+                <><span className="h-2 w-2 rounded-full bg-white animate-pulse" />Stop</>
               ) : (
-                <>
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                  Record Live
-                </>
+                <><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>Record</>
               )}
             </button>
-
+            {meeting.has_extractions && (
+              <button
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-500 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {exporting ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                {exporting ? "Exporting…" : "Export PDF"}
+              </button>
+            )}
             <button
               onClick={runExtraction}
               disabled={extracting || !meeting.transcript_id}
-              className="rounded-full bg-ledger-pink px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_0_20px_rgba(244,114,182,0.5)] hover:bg-pink-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-ledger-pink px-3 py-1.5 text-sm font-medium text-slate-950 hover:bg-pink-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {extracting ? "Extracting…" : "Re-run Extraction"}
+              {extracting ? "Extracting…" : "Re-run AI"}
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="relative mx-auto max-w-7xl px-6 py-10">
+      {/* Audio Upload Modal */}
+      {showAudioUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-1 text-lg font-semibold">Upload Audio / Video</h2>
+            <p className="mb-4 text-sm text-slate-400">We'll automatically transcribe it using AI.</p>
+            <div className="mb-4">
+              <label className="mb-1.5 block text-sm text-slate-300">Select file</label>
+              <input
+                type="file"
+                accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.ogg"
+                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-slate-100 file:mr-4 file:rounded-lg file:border-0 file:bg-ledger-pink file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-950 hover:file:bg-pink-400"
+              />
+              <p className="mt-1.5 text-xs text-slate-500">MP3, MP4, WAV, M4A, WebM, OGG · Max 25MB</p>
+            </div>
+            {audioFile && (
+              <div className="mb-4 rounded-lg border border-slate-700 bg-slate-800/30 px-4 py-3 flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-ledger-pink/20 flex items-center justify-center text-ledger-pink text-sm">♪</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-200 truncate">{audioFile.name}</p>
+                  <p className="text-xs text-slate-500">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                </div>
+              </div>
+            )}
+            {uploadProgress && (
+              <div className="mb-4 rounded-lg border border-ledger-pink/30 bg-ledger-pink/5 px-4 py-2.5 flex items-center gap-2">
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ledger-pink border-t-transparent" />
+                <p className="text-sm text-ledger-pink">{uploadProgress}</p>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => { setShowAudioUpload(false); setAudioFile(null); }} disabled={uploadingAudio}
+                className="flex-1 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleAudioUpload} disabled={uploadingAudio || !audioFile}
+                className="flex-1 rounded-lg bg-ledger-pink px-4 py-2 text-sm font-medium text-slate-950 hover:bg-pink-400 transition-colors disabled:opacity-50">
+                {uploadingAudio ? "Processing…" : "Transcribe"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="px-8 py-8 max-w-7xl">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-semibold">{meeting.title}</h1>
@@ -1125,6 +1069,7 @@ Alice: Let's do a code freeze on Wednesday."
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 }
