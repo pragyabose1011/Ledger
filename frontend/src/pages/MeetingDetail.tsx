@@ -927,7 +927,6 @@ export default function MeetingDetailPage() {
             </div>
           </div>
         )}
-      </main>
 
       {/* Live Recording Panel */}
       {isRecording && (
