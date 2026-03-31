@@ -9,6 +9,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Ledger")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 
 def is_email_configured() -> bool:
@@ -93,7 +94,7 @@ Log in to Ledger to acknowledge this item and track your progress.
             <div class="meeting">From: {meeting_title}</div>
             {"<div class='due'>📅 Due: " + due_date + "</div>" if due_date else ""}
         </div>
-        <a href="#" class="button">View in Ledger</a>
+        <a href="{FRONTEND_URL}/meetings" class="button">View in Ledger</a>
         <div class="footer">— The Ledger Team</div>
     </div>
 </body>
@@ -164,7 +165,7 @@ Please log in to Ledger to update the status of this item.
             <div class="meeting">From: {meeting_title}</div>
             <div class="due">📅 Due: {due_date}</div>
         </div>
-        <a href="#" class="button">Update Status</a>
+        <a href="{FRONTEND_URL}/meetings" class="button">Update Status</a>
         <div class="footer">— The Ledger Team</div>
     </div>
 </body>
@@ -255,7 +256,7 @@ Log in to Ledger to stay on top of your tasks.
             {"<div style='padding: 8px 0; color: #94a3b8;'>... and " + str(len(action_items_list) - 10) + " more</div>" if len(action_items_list) > 10 else ""}
         </div>
         
-        <a href="#" class="button">View Dashboard</a>
+        <a href="{FRONTEND_URL}/dashboard" class="button">View Dashboard</a>
         <div class="footer">— The Ledger Team</div>
     </div>
 </body>

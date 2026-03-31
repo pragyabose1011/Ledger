@@ -22,6 +22,13 @@ SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "change-me-dev-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
+if SECRET_KEY == "change-me-dev-secret":
+    import logging
+    logging.warning(
+        "JWT_SECRET_KEY is set to the default dev value. "
+        "Set a strong random secret via JWT_SECRET_KEY env var before deploying."
+    )
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # ── Email validation ─────────────────────────────────────────────────

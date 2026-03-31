@@ -24,6 +24,8 @@ from app.services.transcription import transcribe_audio
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 
 def get_db():
     db = SessionLocal()
@@ -38,9 +40,10 @@ def get_db():
 @router.get("/zoom/status")
 def zoom_status():
     """Check if Zoom integration is configured."""
+    redirect_uri = f"{FRONTEND_URL}/oauth/callback"
     return {
         "configured": bool(ZOOM_CLIENT_ID),
-        "auth_url": f"https://zoom.us/oauth/authorize?response_type=code&client_id={ZOOM_CLIENT_ID}&redirect_uri=http://localhost:5173/oauth/callback" if ZOOM_CLIENT_ID else None,
+        "auth_url": f"https://zoom.us/oauth/authorize?response_type=code&client_id={ZOOM_CLIENT_ID}&redirect_uri={redirect_uri}" if ZOOM_CLIENT_ID else None,
     }
 
 
@@ -142,9 +145,10 @@ TEAMS_CLIENT_ID = os.getenv("MICROSOFT_CLIENT_ID", "")
 @router.get("/teams/status")
 def teams_status():
     """Check if Microsoft Teams integration is configured."""
+    redirect_uri = f"{FRONTEND_URL}/oauth/callback"
     return {
         "configured": bool(TEAMS_CLIENT_ID),
-        "auth_url": f"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={TEAMS_CLIENT_ID}&response_type=code&redirect_uri=http://localhost:5173/oauth/callback&scope=OnlineMeetings.Read" if TEAMS_CLIENT_ID else None,
+        "auth_url": f"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={TEAMS_CLIENT_ID}&response_type=code&redirect_uri={redirect_uri}&scope=OnlineMeetings.Read" if TEAMS_CLIENT_ID else None,
     }
 
 
@@ -155,7 +159,8 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 @router.get("/meet/status")
 def meet_status():
     """Check if Google Meet integration is configured."""
+    redirect_uri = f"{FRONTEND_URL}/oauth/callback"
     return {
         "configured": bool(GOOGLE_CLIENT_ID),
-        "auth_url": f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri=http://localhost:5173/oauth/callback&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly" if GOOGLE_CLIENT_ID else None,
+        "auth_url": f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly" if GOOGLE_CLIENT_ID else None,
     }

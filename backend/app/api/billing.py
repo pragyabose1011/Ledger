@@ -75,7 +75,9 @@ def billing_status(
         return {"plan": "free", "status": "none"}
 
     if not STRIPE_SECRET_KEY:
-        return {"plan": "pro", "status": "active"}
+        # Stripe not configured but user has a subscription ID recorded — treat as active
+        # (can't verify live status without API key)
+        return {"plan": "pro", "status": "unverified"}
 
     try:
         sub = stripe.Subscription.retrieve(current_user.stripe_subscription_id)

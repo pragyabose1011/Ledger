@@ -30,15 +30,20 @@ from app.api.room import room_router, ws_router as room_ws_router
 
 app = FastAPI(title="Ledger API", version="0.1.0")
 
+_frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+_extra_origins = [o.strip() for o in os.getenv("EXTRA_CORS_ORIGINS", "").split(",") if o.strip()]
+_cors_origins = list({
+    _frontend_url,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://localhost",
+    "http://localhost:80",
+} | set(_extra_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://localhost",
-        "http://localhost:80",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

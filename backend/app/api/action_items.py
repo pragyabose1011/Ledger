@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.db.models.action_item import ActionItem
+from app.db.models.meeting import Meeting
 from app.api.auth import get_current_user
 from app.db.models.user import User
 
@@ -20,8 +21,34 @@ def get_db():
         db.close()
 
 
+def _get_item_for_user(action_item_id: str, current_user: User, db: Session) -> ActionItem:
+    """Fetch an action item, verifying the current user owns the parent meeting."""
+    item = db.query(ActionItem).get(action_item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Action item not found")
+    meeting = db.query(Meeting).filter(
+        Meeting.id == item.meeting_id,
+        Meeting.owner_id == current_user.id,
+    ).first()
+    if not meeting:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return item
+
+
 @router.post("/")
-def create_action_item(payload: dict, db: Session = Depends(get_db)):
+def create_action_item(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Verify the meeting belongs to the current user
+    meeting = db.query(Meeting).filter(
+        Meeting.id == payload.get("meeting_id"),
+        Meeting.owner_id == current_user.id,
+    ).first()
+    if not meeting:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     item = ActionItem(
         meeting_id=payload["meeting_id"],
         owner_id=payload.get("owner_id"),
@@ -41,9 +68,7 @@ def acknowledge_action_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(ActionItem).get(action_item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Action item not found")
+    item = _get_item_for_user(action_item_id, current_user, db)
 
     if item.status == "done":
         return {"status": "already_done"}
@@ -62,9 +87,7 @@ def mark_action_item_done(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(ActionItem).get(action_item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Action item not found")
+    item = _get_item_for_user(action_item_id, current_user, db)
 
     item.status = "done"
     db.add(item)
@@ -80,9 +103,7 @@ def reopen_action_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(ActionItem).get(action_item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Action item not found")
+    item = _get_item_for_user(action_item_id, current_user, db)
 
     item.status = "open"
     db.add(item)

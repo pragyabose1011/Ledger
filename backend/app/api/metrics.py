@@ -16,49 +16,52 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 
 @router.get("/dashboard")
-def get_dashboard_metrics(db: Session = Depends(get_db)):
-    """Get dashboard metrics across all meetings."""
+def get_dashboard_metrics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get dashboard metrics for the current user's meetings."""
     now = datetime.utcnow()
     four_weeks_ago = now - timedelta(weeks=4)
 
-    # Count meetings in last 4 weeks
-    # Try start_time first, fall back to created_at
+    # Count meetings in last 4 weeks (current user only)
     recent_meetings = (
         db.query(Meeting)
         .filter(
+            Meeting.owner_id == current_user.id,
             (
                 (Meeting.start_time != None) & (Meeting.start_time >= four_weeks_ago)
             )
             | (
                 (Meeting.start_time == None) & (Meeting.created_at >= four_weeks_ago)
-            )
+            ),
         )
         .count()
     )
 
-    # If no recent meetings found, count ALL meetings as fallback
-    total_meetings = db.query(Meeting).count()
+    # If no recent meetings, count ALL of this user's meetings as fallback
+    total_meetings = db.query(Meeting).filter(Meeting.owner_id == current_user.id).count()
     if recent_meetings == 0 and total_meetings > 0:
         recent_meetings = total_meetings
 
-    # Count all decisions (recent meetings)
+    # Recent meeting IDs for this user
     recent_meeting_ids = (
         db.query(Meeting.id)
         .filter(
+            Meeting.owner_id == current_user.id,
             (
                 (Meeting.start_time != None) & (Meeting.start_time >= four_weeks_ago)
             )
             | (
                 (Meeting.start_time == None) & (Meeting.created_at >= four_weeks_ago)
-            )
+            ),
         )
         .all()
     )
     meeting_ids = [m.id for m in recent_meeting_ids]
 
-    # If no recent meetings, use all meeting IDs
     if not meeting_ids:
-        all_meetings = db.query(Meeting.id).all()
+        all_meetings = db.query(Meeting.id).filter(Meeting.owner_id == current_user.id).all()
         meeting_ids = [m.id for m in all_meetings]
 
     total_decisions = 0
@@ -85,8 +88,6 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
             .count()
         )
 
-    # Productivity score: simple heuristic
-    # Score = (decisions + completed actions) / total meetings * 10, capped at 10
     completed_actions = total_action_items - open_action_items
     if recent_meetings > 0:
         raw_score = ((total_decisions + completed_actions) / recent_meetings) * 10
@@ -94,7 +95,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
     else:
         productivity_score = 0
 
-    # Weekly metrics: group by week
+    # Weekly metrics
     weekly_metrics = []
     for i in range(4):
         week_start = now - timedelta(weeks=i + 1)
@@ -103,6 +104,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
         week_meeting_ids = (
             db.query(Meeting.id)
             .filter(
+                Meeting.owner_id == current_user.id,
                 (
                     (Meeting.start_time != None)
                     & (Meeting.start_time >= week_start)
@@ -112,7 +114,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
                     (Meeting.start_time == None)
                     & (Meeting.created_at >= week_start)
                     & (Meeting.created_at < week_end)
-                )
+                ),
             )
             .all()
         )
@@ -143,9 +145,11 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
 
     weekly_metrics.reverse()
 
-    # Alerts
+    # Alerts for this user's meetings
+    user_meeting_ids = meeting_ids or []
     alerts = (
         db.query(Alert)
+        .filter(Alert.meeting_id.in_(user_meeting_ids) if user_meeting_ids else Alert.id == None)
         .order_by(Alert.created_at.desc())
         .limit(10)
         .all()
@@ -153,7 +157,6 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
 
     alert_list = []
     for alert in alerts:
-        # Get meeting title
         meeting_title = ""
         if alert.meeting_id:
             meeting = db.query(Meeting).filter(Meeting.id == alert.meeting_id).first()
@@ -189,7 +192,6 @@ def get_meeting_metrics(
     db: Session = Depends(get_db),
 ):
     """Per-meeting productivity metrics."""
-    from app.db.models.user import User as UserModel
     meeting = db.query(Meeting).filter(
         Meeting.id == meeting_id,
         Meeting.owner_id == current_user.id,

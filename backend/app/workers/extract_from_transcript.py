@@ -51,12 +51,9 @@ def process_transcript(db, llm, transcript):
         owner_id = None
         if owner_name:
             owner = db.query(User).filter(User.name == owner_name).first()
-            if not owner:
-                owner = User(name=owner_name, email=f"{owner_name.lower().replace(' ', '.')}@example.com")
-                db.add(owner)
-                db.commit()
-                db.refresh(owner)
-            owner_id = owner.id
+            if owner:
+                owner_id = owner.id
+            # If no matching user found, leave owner_id as None (don't create ghost accounts)
 
         db.add(
             Decision(
@@ -76,12 +73,9 @@ def process_transcript(db, llm, transcript):
         owner_id = None
         if owner_name:
             owner = db.query(User).filter(User.name == owner_name).first()
-            if not owner:
-                owner = User(name=owner_name, email=f"{owner_name.lower().replace(' ', '.')}@example.com")
-                db.add(owner)
-                db.commit()
-                db.refresh(owner)
-            owner_id = owner.id
+            if owner:
+                owner_id = owner.id
+            # If no matching user found, leave owner_id as None (don't create ghost accounts)
 
         due = None
         if a.get("due_date"):
