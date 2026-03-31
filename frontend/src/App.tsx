@@ -41,6 +41,8 @@ import IntegrationsPage from "./pages/Integrations";
 import ProfilePage from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import DemoPage from "./pages/Demo";
+import RoomPage from "./pages/Room";
 
 // Redirect logged-in users away from login/signup
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -78,6 +80,8 @@ function App() {
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/demo" element={<DemoPage />} />
+      <Route path="/room/:roomId" element={<ProtectedRoute><RoomPage /></ProtectedRoute>} />
     </Routes>
     </>
   );

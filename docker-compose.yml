@@ -36,6 +36,7 @@ services:
     volumes:
       - chroma-data:/app/chroma_db
       - uploads-data:/app/uploads
+      - model-cache:/root/.cache/huggingface
     networks:
       - ledger-net
     depends_on:
@@ -64,3 +65,4 @@ volumes:
   mysql-data:
   chroma-data:
   uploads-data:
+  model-cache:

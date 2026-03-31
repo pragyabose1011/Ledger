@@ -638,7 +638,7 @@ export default function Profile() {
                 ) : (
                   <button onClick={handleUpgrade}
                     className="rounded-lg bg-ledger-pink px-5 py-2.5 text-sm font-medium text-slate-950 hover:bg-pink-400 transition-colors shadow-[0_0_20px_rgba(244,114,182,0.5)]">
-                    Upgrade to Pro — $19/mo
+                    Upgrade to Pro — ₹1,499/mo
                   </button>
                 )}
               </div>
@@ -647,12 +647,12 @@ export default function Profile() {
             <div className="grid gap-4 md:grid-cols-2">
               {[
                 {
-                  name: "Free", price: "$0", active: billing?.plan !== "pro",
+                  name: "Free", price: "₹0", active: billing?.plan !== "pro",
                   features: ["10 meetings/month", "AI extraction", "Basic analytics", "PDF export"],
                   color: "emerald",
                 },
                 {
-                  name: "Pro", price: "$19", active: billing?.plan === "pro",
+                  name: "Pro", price: "₹1,499", active: billing?.plan === "pro",
                   features: ["Unlimited meetings", "AI extraction + RAG", "Advanced analytics", "Calendar integrations", "Team collaboration", "Priority support"],
                   color: "pink",
                 },

@@ -43,7 +43,12 @@ async def live_assist(
 
     try:
         result = await _call_llm(prompt)
-        return result
+        return {
+            "summary": result.get("summary", ""),
+            "questions": result.get("questions") if isinstance(result.get("questions"), list) else [],
+            "action_items": result.get("action_items") if isinstance(result.get("action_items"), list) else [],
+            "decisions": result.get("decisions") if isinstance(result.get("decisions"), list) else [],
+        }
     except Exception:
         return _EMPTY
 

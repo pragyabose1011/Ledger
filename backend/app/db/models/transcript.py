@@ -7,7 +7,7 @@ from app.db.base import Base
 class Transcript(Base):
     __tablename__ = "transcripts"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    meeting_id = Column(String, ForeignKey("meetings.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    meeting_id = Column(String(36), ForeignKey("meetings.id"), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

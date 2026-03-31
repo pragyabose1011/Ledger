@@ -26,6 +26,7 @@ from app.api.colleagues import router as colleagues_router
 from app.api.chat import router as chat_router
 from app.api.billing import router as billing_router
 from app.api.live import router as live_router
+from app.api.room import room_router, ws_router as room_ws_router
 
 app = FastAPI(title="Ledger API", version="0.1.0")
 
@@ -76,6 +77,8 @@ app.include_router(colleagues_router)
 app.include_router(chat_router)
 app.include_router(billing_router)
 app.include_router(live_router)
+app.include_router(room_router)
+app.include_router(room_ws_router)
 
 
 @app.get("/")

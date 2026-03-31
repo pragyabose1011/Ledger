@@ -207,6 +207,16 @@ export default function LoginPage() {
               Sign up
             </Link>
           </p>
+
+          <div className="mt-6 pt-5 border-t border-slate-800 text-center">
+            <p className="text-xs text-slate-500 mb-2">Not sure yet?</p>
+            <button
+              onClick={() => navigate("/demo")}
+              className="text-sm text-ledger-pink hover:text-pink-400 transition-colors underline underline-offset-4"
+            >
+              See a sample meeting output first →
+            </button>
+          </div>
         </div>
       </div>
     </div>

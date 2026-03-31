@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import Layout from "../components/Layout";
 
 type CalendarMeeting = {
   id: string;
@@ -51,17 +52,24 @@ export default function CalendarPage() {
     }
   };
 
-  const getMeetingDate = (meeting: CalendarMeeting): Date => {
-    const dateStr = meeting.start_time || meeting.created_at;
-    return new Date(dateStr);
-  };
+  const meetingsByDay = useMemo(() => {
+    const map = new Map<number, CalendarMeeting[]>();
+    for (const m of meetings) {
+      const d = new Date(m.start_time || m.created_at);
+      if (d.getMonth() === month && d.getFullYear() === year) {
+        const day = d.getDate();
+        const existing = map.get(day);
+        if (existing) existing.push(m);
+        else map.set(day, [m]);
+      }
+    }
+    return map;
+  }, [meetings, year, month]);
 
-  const getMeetingsForDay = (day: number): CalendarMeeting[] => {
-    return meetings.filter((m) => {
-      const d = getMeetingDate(m);
-      return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
-    });
-  };
+  const todayDay = useMemo(() => {
+    const today = new Date();
+    return today.getMonth() === month && today.getFullYear() === year ? today.getDate() : null;
+  }, [year, month]);
 
   const getDaysInMonth = (year: number, month: number): number => {
     return new Date(year, month + 1, 0).getDate();
@@ -99,13 +107,8 @@ export default function CalendarPage() {
   }
 
   const selectedDayMeetings = selectedDate
-    ? getMeetingsForDay(selectedDate.getDate())
+    ? (meetingsByDay.get(selectedDate.getDate()) ?? [])
     : [];
-
-  const isToday = (day: number) => {
-    const today = new Date();
-    return day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-  };
 
   const isSelected = (day: number) => {
     return selectedDate?.getDate() === day && 
@@ -114,40 +117,8 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(244,114,182,0.1),_transparent_50%)]" />
-
-      <header className="relative border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-ledger-pink shadow-[0_0_25px_rgba(244,114,182,0.7)]" />
-            <span className="text-lg font-semibold tracking-tight">Ledger</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/chat")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Ask AI
-            </button>
-            <button
-              onClick={() => navigate("/meetings")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Meetings
-            </button>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-sm text-slate-300 hover:text-ledger-pink transition-colors"
-            >
-              Dashboard
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="relative mx-auto max-w-7xl px-6 py-10">
+    <Layout>
+      <div className="px-8 py-8 max-w-7xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold">Calendar</h1>
@@ -210,7 +181,7 @@ export default function CalendarPage() {
                     return <div key={idx} className="h-24" />;
                   }
 
-                  const dayMeetings = getMeetingsForDay(day);
+                  const dayMeetings = meetingsByDay.get(day) ?? [];
                   const hasExtracted = dayMeetings.some((m) => m.has_extractions);
 
                   return (
@@ -220,14 +191,14 @@ export default function CalendarPage() {
                       className={`h-24 p-2 rounded-lg border transition-all text-left flex flex-col ${
                         isSelected(day)
                           ? "border-ledger-pink bg-pink-500/10"
-                          : isToday(day)
+                          : day === todayDay
                           ? "border-slate-600 bg-slate-800/50"
                           : "border-slate-800 hover:border-slate-700 hover:bg-slate-800/30"
                       }`}
                     >
                       <span
                         className={`text-sm font-medium ${
-                          isToday(day) ? "text-ledger-pink" : "text-slate-300"
+                          day === todayDay ? "text-ledger-pink" : "text-slate-300"
                         }`}
                       >
                         {day}
@@ -341,7 +312,7 @@ export default function CalendarPage() {
             )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }

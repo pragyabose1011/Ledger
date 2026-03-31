@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { api } from "../lib/api";
 
 const navItems = [
   {
@@ -52,6 +53,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const startMeeting = async () => {
+    try {
+      const r = await api.post("/rooms/create", { title: "" });
+      navigate(`/room/${r.data.room_id}`);
+    } catch {}
+  };
+
   const isActive = (path: string) =>
     path === "/meetings"
       ? location.pathname === "/meetings" || location.pathname.startsWith("/meetings/")
@@ -73,6 +81,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <button onClick={() => navigate("/meetings")} className="flex items-center gap-2.5">
             <div className="h-7 w-7 rounded-full bg-ledger-pink shadow-[0_0_18px_rgba(228,133,182,0.6)]" />
             <span className="text-[15px] font-semibold tracking-tight">Ledger</span>
+          </button>
+        </div>
+
+        {/* New Meeting */}
+        <div className="px-3 py-3 border-b border-slate-800/60">
+          <button
+            onClick={startMeeting}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-ledger-pink/10 border border-ledger-pink/20 px-3 py-2.5 text-sm font-medium text-ledger-pink hover:bg-ledger-pink/20 transition-colors"
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Meeting
           </button>
         </div>
 
