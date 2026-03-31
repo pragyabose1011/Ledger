@@ -2,6 +2,29 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
+// SpeechRecognition types (not in all TS libs)
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: { [index: number]: { [index: number]: { transcript: string } } };
+}
+interface ISpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
+
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
@@ -61,6 +84,13 @@ export default function Room() {
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
 
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Transcript capture via Web Speech API
+  const [transcribing, setTranscribing] = useState(false);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const transcriptRef = useRef("");
+  const startTimeRef = useRef<string>(new Date().toISOString());
 
   const wsRef = useRef<WebSocket | null>(null);
   const pcs = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -77,9 +107,11 @@ export default function Room() {
     }
   }, [roomId, navigate]);
 
-  // Get local media
+  // Get local media + start speech recognition
   useEffect(() => {
     let acquired: MediaStream;
+    startTimeRef.current = new Date().toISOString();
+
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then(s => { acquired = s; setLocalStream(s); localStreamRef.current = s; })
       .catch(() => {
@@ -87,7 +119,35 @@ export default function Room() {
           .then(s => { acquired = s; setLocalStream(s); localStreamRef.current = s; })
           .catch(() => {});
       });
-    return () => { acquired?.getTracks().forEach(t => t.stop()); };
+
+    // Start live transcription if supported
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+      rec.onresult = (e: SpeechRecognitionEvent) => {
+        let newText = "";
+        for (let i = e.resultIndex; i < Object.keys(e.results).length; i++) {
+          newText += e.results[i][0].transcript + " ";
+        }
+        transcriptRef.current += newText;
+      };
+      rec.onstart = () => setTranscribing(true);
+      rec.onend = () => {
+        // Auto-restart so it keeps running
+        try { rec.start(); } catch {}
+      };
+      rec.onerror = () => setTranscribing(false);
+      try { rec.start(); } catch {}
+      recognitionRef.current = rec;
+    }
+
+    return () => {
+      acquired?.getTracks().forEach(t => t.stop());
+      recognitionRef.current?.stop();
+    };
   }, []);
 
   // When stream becomes available, add tracks to existing peer connections
@@ -265,11 +325,36 @@ export default function Room() {
     setShowReactions(false);
   };
 
-  const endCall = () => {
+  const endCall = async () => {
+    recognitionRef.current?.stop();
     localStream?.getTracks().forEach(t => t.stop());
     screenStream?.getTracks().forEach(t => t.stop());
     wsRef.current?.close();
-    navigate("/meetings");
+
+    const capturedTranscript = transcriptRef.current.trim();
+    if (!capturedTranscript || !roomId) {
+      navigate("/meetings");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const r = await api.post(`/rooms/${roomId}/end`, {
+        title: roomTitle,
+        transcript: capturedTranscript,
+        start_time: startTimeRef.current,
+        end_time: new Date().toISOString(),
+      });
+      if (r.data.meeting_id) {
+        navigate(`/meetings/${r.data.meeting_id}`);
+      } else {
+        navigate("/meetings");
+      }
+    } catch {
+      navigate("/meetings");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const copyLink = () => {
@@ -302,9 +387,14 @@ export default function Room() {
             {copied ? "Copied!" : roomId}
           </button>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          {count} participant{count !== 1 ? "s" : ""}
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          {transcribing && (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Transcribing
+            </span>
+          )}
+          <span>{count} participant{count !== 1 ? "s" : ""}</span>
         </div>
       </div>
 
@@ -439,10 +529,11 @@ export default function Room() {
 
           <button
             onClick={endCall}
-            className="flex items-center gap-2 rounded-xl bg-red-500/15 border border-red-500/30 px-5 py-3 text-sm font-medium text-red-400 hover:bg-red-500/25 transition-colors"
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-red-500/15 border border-red-500/30 px-5 py-3 text-sm font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-60"
           >
             <PhoneOffIcon />
-            End
+            {saving ? "Saving…" : "End"}
           </button>
         </div>
       </div>

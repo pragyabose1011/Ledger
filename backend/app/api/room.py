@@ -1,7 +1,7 @@
 """WebRTC signaling and room management for built-in meetings."""
 import uuid
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional, List
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, HTTPException
 from jose import JWTError, jwt
@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal, get_db
 from app.db.models.user import User
+from app.db.models.meeting import Meeting
+from app.db.models.transcript import Transcript
 from app.api.auth import get_current_user, SECRET_KEY, ALGORITHM
 
 room_router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -23,6 +25,14 @@ _ws_connections: Dict[str, Dict[str, WebSocket]] = {}
 
 class CreateRoomRequest(BaseModel):
     title: str = ""
+
+
+class EndRoomRequest(BaseModel):
+    title: str = ""
+    transcript: str = ""
+    participants: List[str] = []
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 
 @room_router.post("/create")
@@ -53,6 +63,66 @@ def get_room(
         **_rooms[rid],
         "participants": list(_participants.get(rid, {}).values()),
     }
+
+
+@room_router.post("/{room_id}/end")
+def end_room(
+    room_id: str,
+    payload: EndRoomRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save meeting transcript and trigger AI extraction."""
+    transcript_text = payload.transcript.strip()
+    if not transcript_text:
+        # No transcript captured — just return without saving
+        return {"meeting_id": None, "status": "no_transcript"}
+
+    rid = room_id.upper()
+    title = payload.title.strip() or _rooms.get(rid, {}).get("title", "Ledger Meeting")
+
+    # Parse times
+    start_time = None
+    end_time = None
+    try:
+        if payload.start_time:
+            start_time = datetime.fromisoformat(payload.start_time.replace("Z", "+00:00"))
+        if payload.end_time:
+            end_time = datetime.fromisoformat(payload.end_time.replace("Z", "+00:00"))
+    except Exception:
+        pass
+
+    # Create meeting record
+    meeting = Meeting(
+        title=title,
+        platform="Ledger",
+        start_time=start_time,
+        end_time=end_time,
+        owner_id=current_user.id,
+    )
+    db.add(meeting)
+    db.commit()
+    db.refresh(meeting)
+
+    # Save transcript
+    t = Transcript(meeting_id=meeting.id, content=transcript_text)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+
+    # Run AI extraction + RAG indexing asynchronously (non-blocking best-effort)
+    try:
+        from app.services.openai_client import get_llm
+        from app.workers.extract_from_transcript import process_transcript
+        from app.api.extract import index_meeting_for_rag
+
+        llm = get_llm()
+        process_transcript(db, llm, t)
+        index_meeting_for_rag(db, meeting.id)
+    except Exception as e:
+        print(f"⚠️ Extraction failed (non-fatal): {e}")
+
+    return {"meeting_id": meeting.id, "status": "saved"}
 
 
 @ws_router.websocket("/ws/room/{room_id}")

@@ -97,28 +97,41 @@ html.light body {
 }
 
 /* ─ Solid backgrounds ─ */
-html.light .bg-slate-950 { background-color: #dde5f0 !important; }
+html.light .bg-slate-950 { background-color: #eef1f7 !important; }
 html.light .bg-slate-900 { background-color: #ffffff !important; }
-html.light .bg-slate-800 { background-color: #e8eef6 !important; }
-html.light .bg-slate-700 { background-color: #dde5f0 !important; }
+html.light .bg-slate-800 { background-color: #e4e9f2 !important; }
+html.light .bg-slate-700 { background-color: #d8dfe9 !important; }
 
-/* Sticky header with frosted glass */
-html.light .bg-slate-950\/80 { background-color: rgba(221,229,240,0.92) !important; }
+/* ─ Sidebar and sticky surfaces ─ */
+html.light .bg-slate-950\/90 { background-color: rgba(255,255,255,0.97) !important; }
+html.light .bg-slate-950\/80 { background-color: rgba(238,241,247,0.95) !important; }
 
-/* ─ Card opacity variants (rendered on page bg → should be clearly white) ─ */
-html.light .bg-slate-900\/80 { background-color: rgba(255,255,255,0.92) !important; }
-html.light .bg-slate-900\/70 { background-color: rgba(255,255,255,0.88) !important; }
-html.light .bg-slate-900\/60 { background-color: rgba(255,255,255,0.85) !important; }
-html.light .bg-slate-900\/50 { background-color: rgba(255,255,255,0.82) !important; }
-html.light .bg-slate-900\/40 { background-color: rgba(255,255,255,0.80) !important; }
-html.light .bg-slate-900\/30 { background-color: rgba(255,255,255,0.70) !important; }
-html.light .bg-slate-900\/20 { background-color: rgba(255,255,255,0.55) !important; }
+/* ─ Card opacity variants ─ */
+html.light .bg-slate-900\/80 { background-color: rgba(255,255,255,0.97) !important; }
+html.light .bg-slate-900\/70 { background-color: rgba(255,255,255,0.95) !important; }
+html.light .bg-slate-900\/60 { background-color: rgba(255,255,255,0.92) !important; }
+html.light .bg-slate-900\/50 { background-color: rgba(255,255,255,0.90) !important; }
+html.light .bg-slate-900\/40 { background-color: rgba(255,255,255,0.88) !important; }
+html.light .bg-slate-900\/30 { background-color: rgba(255,255,255,0.80) !important; }
+html.light .bg-slate-900\/20 { background-color: rgba(255,255,255,0.65) !important; }
 
 /* ─ Input / element opacity variants ─ */
-html.light .bg-slate-800\/60 { background-color: rgba(232,238,246,0.7) !important; }
-html.light .bg-slate-800\/50 { background-color: rgba(241,245,249,0.95) !important; }
-html.light .bg-slate-800\/40 { background-color: rgba(232,238,246,0.55) !important; }
-html.light .bg-slate-800\/20 { background-color: rgba(232,238,246,0.35) !important; }
+html.light .bg-slate-800\/60 { background-color: rgba(228,233,242,0.8) !important; }
+html.light .bg-slate-800\/50 { background-color: rgba(241,245,249,0.98) !important; }
+html.light .bg-slate-800\/40 { background-color: rgba(228,233,242,0.6) !important; }
+html.light .bg-slate-800\/20 { background-color: rgba(228,233,242,0.4) !important; }
+
+/* ─ Cards get elevation via shadow ─ */
+html.light .rounded-2xl.border,
+html.light .rounded-xl.border {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+
+/* ─ Sidebar gets a right border shadow ─ */
+html.light aside {
+  box-shadow: 1px 0 0 #d1d9e6 !important;
+  border-right-color: #d1d9e6 !important;
+}
 
 /* ─ Text — all significantly darker ─ */
 html.light .text-slate-50  { color: #060d1a !important; }
@@ -155,9 +168,17 @@ html.light select option {
 }
 
 /* ─ Hover states ─ */
-html.light .hover\:bg-slate-800:hover    { background-color: #dde5f0 !important; }
-html.light .hover\:bg-slate-800\/40:hover { background-color: rgba(221,229,240,0.6) !important; }
+html.light .hover\:bg-slate-800:hover     { background-color: #e4e9f2 !important; }
+html.light .hover\:bg-slate-800\/60:hover { background-color: rgba(228,233,242,0.85) !important; }
+html.light .hover\:bg-slate-800\/40:hover { background-color: rgba(228,233,242,0.6) !important; }
 html.light .group:hover .group-hover\:bg-ledger-pink\/20 { background-color: rgba(228,133,182,0.15) !important; }
+
+/* ─ Sidebar active item ─ */
+html.light .bg-ledger-pink\/10 { background-color: rgba(228,133,182,0.12) !important; }
+
+/* ─ Dividers inside sidebar ─ */
+html.light .border-slate-800\/60 { border-color: rgba(209,217,230,0.8) !important; }
+html.light .border-slate-800\/70 { border-color: rgba(209,217,230,0.9) !important; }
 
 /* ─ Keep modal overlays, pink accents, status colors untouched ─ */
 html.light .bg-black\/60    { background-color: rgba(0,0,0,0.45) !important; }
