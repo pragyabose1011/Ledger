@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 
@@ -53,11 +54,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const startMeeting = async () => {
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [meetingTitle, setMeetingTitle] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const openNameModal = () => {
+    setMeetingTitle("");
+    setShowNameModal(true);
+  };
+
+  const createMeeting = async () => {
+    setCreating(true);
     try {
-      const r = await api.post("/rooms/create", { title: "" });
+      const r = await api.post("/rooms/create", { title: meetingTitle.trim() });
+      setShowNameModal(false);
       navigate(`/room/${r.data.room_id}`);
-    } catch {}
+    } catch {
+      // silently ignore — user stays on modal
+    } finally {
+      setCreating(false);
+    }
   };
 
   const isActive = (path: string) =>
@@ -87,7 +103,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* New Meeting */}
         <div className="px-3 py-3 border-b border-slate-800/60">
           <button
-            onClick={startMeeting}
+            onClick={openNameModal}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-ledger-pink/10 border border-ledger-pink/20 px-3 py-2.5 text-sm font-medium text-ledger-pink hover:bg-ledger-pink/20 transition-colors"
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -161,6 +177,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="relative z-10 ml-[220px] flex min-h-screen flex-1 flex-col">
         {children}
       </div>
+
+      {/* New Meeting Name Modal */}
+      {showNameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div className="mb-5">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-8 w-8 rounded-full bg-ledger-pink/20 flex items-center justify-center">
+                  <div className="h-3 w-3 rounded-full bg-ledger-pink" />
+                </div>
+                <h2 className="text-lg font-semibold text-slate-100">Name your meeting</h2>
+              </div>
+              <p className="text-sm text-slate-500 ml-11">Give this meeting a title so you can find it later.</p>
+            </div>
+
+            <input
+              autoFocus
+              type="text"
+              value={meetingTitle}
+              onChange={e => setMeetingTitle(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && !creating && createMeeting()}
+              placeholder="e.g. Q3 Planning, Design Review…"
+              className="w-full rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-ledger-pink/50 focus:outline-none mb-4"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowNameModal(false)}
+                className="flex-1 rounded-xl border border-slate-700 bg-slate-800/40 px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createMeeting}
+                disabled={creating}
+                className="flex-1 rounded-xl bg-ledger-pink px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-pink-400 transition-colors disabled:opacity-60"
+              >
+                {creating ? "Starting…" : "Start meeting"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

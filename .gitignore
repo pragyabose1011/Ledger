@@ -1,6 +1,41 @@
+# Python
 backend/venv/
-backend/ledger.db
-*.pyc
 __pycache__/
-.env
+*.pyc
+*.pyo
+*.egg-info/
+
+# Database files
+*.db
 *.sqlite3
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Uploads & generated data
+backend/uploads/
+backend/chroma_db/
+
+# macOS / OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/
